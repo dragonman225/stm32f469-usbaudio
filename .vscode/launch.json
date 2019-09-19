@@ -1,0 +1,18 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "cortex-debug",
+      "request": "launch",
+      "servertype": "openocd",
+      "cwd": "${workspaceRoot}",
+      "executable": "./build/f469-usbaudio-ex2.elf",
+      "name": "Debug (OpenOCD)",
+      "device": "STM32F469NI",
+      "configFiles": [
+        "STM32F469NI.openocd.cfg"
+      ],
+      "svdFile": "STM32F469.svd"
+    }
+  ]
+}
