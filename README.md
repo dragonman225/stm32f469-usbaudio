@@ -48,6 +48,14 @@ Use [STM32CubeProg](https://www.st.com/en/development-tools/stm32cubeprog.html).
    alsa_output.usb-STMicroelectronics_STM32_AUDIO_Streaming_in_FS_Mode_<serial_number>-00.analog-stereo
    ```
 
+### Debug program
+
+VSCode, using [`cortex-debug`](https://github.com/Marus/cortex-debug) extension :
+
+On Debug tab, choose "Debug (OpenOCD)" and start.
+
+* SVD file used to display peripheral registers is taken from https://github.com/posborne/cmsis-svd/blob/master/data/STMicro/STM32F469.svd
+
 ## Notes
 
 * Audio become distorted for several seconds every 5 ~ 6 minutes because this example use USB Isochronous Transfers at 48k samples/s but the board is not able to generate accurate clock that is integer multiples of 48kHz for Serial Audio Interface output.
