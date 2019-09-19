@@ -32,7 +32,8 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "stm32469i_discovery.h"
+#include "stm32469i_discovery_audio.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/

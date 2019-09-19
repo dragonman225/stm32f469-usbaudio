@@ -65,11 +65,14 @@ Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_pwr_ex.c \
 Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_cortex.c \
 Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal.c \
 Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_exti.c \
+Drivers/BSP/STM32469I-Discovery/stm32469i_discovery.c \
+Drivers/BSP/STM32469I-Discovery/stm32469i_discovery_audio.c \
+Drivers/BSP/Components/cs43l22/cs43l22.c \
 Src/system_stm32f4xx.c \
 Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_core.c \
 Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_ctlreq.c \
 Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_ioreq.c \
-Middlewares/ST/STM32_USB_Device_Library/Class/AUDIO/Src/usbd_audio.c  
+Middlewares/ST/STM32_USB_Device_Library/Class/AUDIO/Src/usbd_audio.c
 
 # ASM sources
 ASM_SOURCES =  \
@@ -133,9 +136,13 @@ C_INCLUDES =  \
 -IDrivers/STM32F4xx_HAL_Driver/Inc/Legacy \
 -IMiddlewares/ST/STM32_USB_Device_Library/Core/Inc \
 -IMiddlewares/ST/STM32_USB_Device_Library/Class/AUDIO/Inc \
+-IMiddlewares/ST/STM32_Audio/Addons/PDM/Inc \
 -IDrivers/CMSIS/Device/ST/STM32F4xx/Include \
 -IDrivers/CMSIS/Include \
--IDrivers/CMSIS/Include
+-IDrivers/CMSIS/Include \
+-IDrivers/BSP/STM32469I-Discovery \
+-IDrivers/BSP/Components/Common \
+-IDrivers/BSP/Components/cs43l22
 
 
 # compile gcc flags
