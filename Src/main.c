@@ -93,8 +93,11 @@ int main(void)
     
     /* Toggle LEDs  */
     BSP_LED_Toggle(LED1);
+    HAL_Delay(100);
     BSP_LED_Toggle(LED2);
+    HAL_Delay(100);
     BSP_LED_Toggle(LED3);
+    HAL_Delay(100);
     BSP_LED_Toggle(LED4);
     HAL_Delay(100);  
   }
