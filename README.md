@@ -28,7 +28,15 @@ make
 
 ### Program the board
 
-Use [STM32CubeProg](https://www.st.com/en/development-tools/stm32cubeprog.html).
+Method 1 : Use `st-flash`
+
+A `make` script is configured to call `st-flash` to program the board.
+
+```bash
+make flash
+```
+
+Method 2 : Use [STM32CubeProg](https://www.st.com/en/development-tools/stm32cubeprog.html).
 
 1. Connect board to PC, open STM32CubeProg, click "Connect".
 
@@ -58,7 +66,7 @@ On Debug tab, choose "Debug (OpenOCD)" and start.
 
 ## Notes
 
-* Audio become distorted for several seconds every 5 ~ 6 minutes because this example use USB Isochronous Transfers at 48k samples/s but the board is not able to generate accurate clock that is integer multiples of 48kHz for Serial Audio Interface output.
+* Audio become distorted for several seconds every 5 ~ 6 minutes because this example doesn't use any synchronization method (`bmAttributes` of `Endpoint 1` is set to `0x01` — Transfer type: Isochronous, Synchronization type: undefined. Source: `Middlewares/ST/STM32_USB_Device_Library/Class/AUDIO/Src/usbd_audio.c:300`, Specification: https://www.usb.org/sites/default/files/audio10.pdf p.61)
 
 * This project can be used as a template for future STM32F4 projects with some modifications.
 
