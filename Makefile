@@ -136,7 +136,7 @@ C_INCLUDES =  \
 -IMiddlewares/ST/STM32_USB_Device_Library/Class/AUDIO/Inc \
 -IMiddlewares/ST/STM32_Audio/Addons/PDM/Inc \
 -IDrivers/CMSIS/Device/ST/STM32F4xx/Include \
--IDrivers/CMSIS/Include \
+-IDrivers/CMSIS/Core/Include \
 -IDrivers/CMSIS/Include \
 -IDrivers/BSP/STM32469I-Discovery \
 -IDrivers/BSP/Components/Common \
@@ -207,6 +207,12 @@ $(BUILD_DIR):
 clean:
 	-rm -fR $(BUILD_DIR)
   
+#######################################
+# Flash binary
+#######################################
+flash:
+	-st-flash write $(BUILD_DIR)/$(TARGET).bin 0x08000000
+
 #######################################
 # dependencies
 #######################################

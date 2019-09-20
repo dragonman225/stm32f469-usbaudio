@@ -1,0 +1,33 @@
+{
+    "configurations": [
+        {
+            "name": "STM32",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "${workspaceFolder}/Inc",
+                "${workspaceFolder}/Drivers/STM32F4xx_HAL_Driver/Inc",
+                "${workspaceFolder}/Drivers/STM32F4xx_HAL_Driver/Inc/Legacy",
+                "${workspaceFolder}/Middlewares/ST/STM32_USB_Device_Library/Core/Inc",
+                "${workspaceFolder}/Middlewares/ST/STM32_USB_Device_Library/Class/AUDIO/Inc",
+                "${workspaceFolder}/Middlewares/ST/STM32_Audio/Addons/PDM/Inc",
+                "${workspaceFolder}/Drivers/CMSIS/Device/ST/STM32F4xx/Include",
+                "${workspaceFolder}/Drivers/CMSIS/Core/Include",
+                "${workspaceFolder}/Drivers/CMSIS/Include",
+                "${workspaceFolder}/Drivers/BSP/STM32469I-Discovery",
+                "${workspaceFolder}/Drivers/BSP/Components/Common",
+                "${workspaceFolder}/Drivers/BSP/Components/cs43l22"
+            ],
+            "defines": [
+                "USE_HAL_DRIVER",
+                "STM32F469xx",
+                "USE_HAL_DRIVER",
+                "STM32F469xx"
+            ],
+            "compilerPath": "/usr/bin/arm-none-eabi-gcc",
+            "cppStandard": "c++17",
+            "cStandard": "c99",
+            "intelliSenseMode": "${default}"
+        }
+    ],
+    "version": 4
+}
