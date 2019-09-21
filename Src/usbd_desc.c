@@ -52,9 +52,9 @@
 #define USBD_VID                      0x0483
 #define USBD_PID                      0x5730
 #define USBD_LANGID_STRING            0x409
-#define USBD_MANUFACTURER_STRING      "STMicroelectronics"
-#define USBD_PRODUCT_HS_STRING        "STM32 AUDIO Streaming in HS Mode"
-#define USBD_PRODUCT_FS_STRING        "STM32 AUDIO Streaming in FS Mode"
+#define USBD_MANUFACTURER_STRING      "Dragonode Audio"
+#define USBD_PRODUCT_HS_STRING        "Venus DAC"
+#define USBD_PRODUCT_FS_STRING        "Venus DAC"
 #define USBD_CONFIGURATION_HS_STRING  "AUDIO Config"
 #define USBD_INTERFACE_HS_STRING      "AUDIO Interface"
 #define USBD_CONFIGURATION_FS_STRING  "AUDIO Config"
