@@ -50,8 +50,13 @@
 #define USBD_MAX_NUM_INTERFACES                       1U
 #endif /* USBD_AUDIO_FREQ */
 
+/* bEndpointAddress, see UAC 1.0 spec, p.61 */
 #define AUDIO_OUT_EP                                  0x01U
-#define USB_AUDIO_CONFIG_DESC_SIZ                     0x6DU
+#define AUDIO_IN_EP                                   0x81U
+
+#define SOF_RATE                                      0x02U
+
+#define USB_AUDIO_CONFIG_DESC_SIZ                     0x76U
 #define AUDIO_INTERFACE_DESC_SIZE                     0x09U
 #define USB_AUDIO_DESC_SIZ                            0x09U
 #define AUDIO_STANDARD_ENDPOINT_DESC_SIZE             0x09U
@@ -93,6 +98,10 @@
 
 
 #define AUDIO_OUT_PACKET                              (uint16_t)(((USBD_AUDIO_FREQ * 2U * 2U) / 1000U))
+
+/* Input endpoint is for feedback. See USB 1.1 Spec, 5.10.4.2 Feedback. */
+#define AUDIO_IN_PACKET                               3U
+
 #define AUDIO_DEFAULT_VOLUME                          70U
 
 /* Number of sub-packets in the audio transfer buffer. You can modify this value but always make sure

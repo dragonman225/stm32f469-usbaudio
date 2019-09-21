@@ -143,6 +143,9 @@
 
 #define USBD_EP_TYPE_CTRL                               0x00U
 #define USBD_EP_TYPE_ISOC                               0x01U
+#define USBD_EP_TYPE_ISOC_ASYNC                         0x05U
+#define USBD_EP_TYPE_ISOC_ADAPT                         0x09U
+#define USBD_EP_TYPE_ISOC_SYNC                          0x0DU
 #define USBD_EP_TYPE_BULK                               0x02U
 #define USBD_EP_TYPE_INTR                               0x03U
 
