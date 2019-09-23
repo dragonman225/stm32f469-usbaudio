@@ -63,6 +63,7 @@
 #include "usbd_audio.h"
 #include "usbd_ctlreq.h"
 
+#include "stm32469i_discovery_audio.h"
 /** @addtogroup STM32_USB_DEVICE_LIBRARY
   * @{
   */
@@ -639,7 +640,10 @@ static uint8_t USBD_AUDIO_SOF(USBD_HandleTypeDef* pdev)
    * 2. Must be volatile so that it can survive compiler optimization.
    */
   static volatile uint32_t fb_value = 0x2FC00000 >> 2;
+  static volatile uint32_t audio_buf_writable_size_last = AUDIO_TOTAL_BUF_SIZE / 2U;
+  static volatile int32_t fb_raw = 0x2FC00000 >> 2;
 
+  /* Do stuff only when playing */
   if (haudio->rd_enable == 1U) {
     // if (remain_buf < AUDIO_TOTAL_BUF_SIZE / 4)
     //   fb_value = 0x2E600000 >> 2;
@@ -658,6 +662,31 @@ static uint8_t USBD_AUDIO_SOF(USBD_HandleTypeDef* pdev)
     //   fb_sent = 1U;
     // }
 
+    /* Calculate remaining writable buffer */
+    uint32_t audio_buf_writable_size;
+    haudio->rd_ptr = AUDIO_TOTAL_BUF_SIZE - BSP_AUDIO_OUT_GetRemainingDataSize();
+    if (haudio->rd_ptr < haudio->wr_ptr) {
+      audio_buf_writable_size = haudio->rd_ptr + AUDIO_TOTAL_BUF_SIZE - haudio->wr_ptr;
+    } else {
+      audio_buf_writable_size = haudio->rd_ptr - haudio->wr_ptr;
+    }
+
+    /* Monitor remaining writable buffer size */
+    if (audio_buf_writable_size < AUDIO_BUF_SAFEZONE) {
+      BSP_LED_On(LED2);
+    } else {
+      BSP_LED_Off(LED2);
+    }
+
+    /* Calculate feedback value based on the change of writable buffer */
+    int32_t audio_buf_writable_size_change;
+    audio_buf_writable_size_change = audio_buf_writable_size - audio_buf_writable_size_last;
+    fb_raw += audio_buf_writable_size_change * 10000;
+    fb_value = (uint32_t)fb_raw;
+
+    /* Update last buffer writable size */
+    audio_buf_writable_size_last = audio_buf_writable_size;
+
     sof_count += 1;
 
     if (sof_count == 32U) {
@@ -669,10 +698,11 @@ static uint8_t USBD_AUDIO_SOF(USBD_HandleTypeDef* pdev)
       // } else {
       //   fb_value = 0x2F000000 >> 2;
       // }
-      if (fb_value == (0x2E600000 >> 2))
-        fb_value = 0x2FC00000 >> 2;
-      else
-        fb_value = 0x2E600000 >> 2;
+
+      // if (fb_value >= (0x30000000 >> 2))
+      //   fb_value = 0x2E600000 >> 2;
+      // else
+      //   fb_value += 0x1000;
 
       sof_count = 0U;
     }
@@ -709,15 +739,15 @@ void USBD_AUDIO_Sync(USBD_HandleTypeDef* pdev, AUDIO_OffsetTypeDef offset)
   USBD_AUDIO_HandleTypeDef* haudio;
   haudio = (USBD_AUDIO_HandleTypeDef*)pdev->pClassData;
 
-  audio_out_halfcplt_count += 1;
+  // audio_out_halfcplt_count += 1;
 
-  if (haudio->rd_enable == 1U) {
-    if (offset == AUDIO_OFFSET_HALF) {
-      haudio->rd_ptr = AUDIO_TOTAL_BUF_SIZE / 2U;
-    } else {
-      haudio->rd_ptr = 0U;
-    }
-  }
+  // if (haudio->rd_enable == 1U) {
+  //   if (offset == AUDIO_OFFSET_HALF) {
+  //     haudio->rd_ptr = AUDIO_TOTAL_BUF_SIZE / 2U;
+  //   } else {
+  //     haudio->rd_ptr = 0U;
+  //   }
+  // }
 
   // uint32_t cmd = 0U;
   // USBD_AUDIO_HandleTypeDef* haudio;
