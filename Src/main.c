@@ -176,6 +176,64 @@ void SystemClock_Config(void)
   HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5);
 }
 
+// void TMR2_Config(uint32_t freq, uint32_t SYSFREQ)
+// {
+//   GPIO_InitTypeDef GPIO_InitStructure;
+
+//   // TIM2_CH1_ETR pin (PA.15) configuration
+//   GPIO_InitStructure.Pin = GPIO_PIN_15;
+//   GPIO_InitStructure.Mode = GPIO_MODE_AF_PP;
+//   GPIO_InitStructure.Alternate = GPIO_AF1_TIM2;
+//   HAL_GPIO_Init(GPIOA, &GPIO_InitStructure);
+
+//   TIM_Base_InitTypeDef TIM_TimeBaseStructure;
+//   TIM_IC_InitTypeDef TIM_ICInitStructure;
+//   TIM_OC_InitTypeDef TIM_OCInitStructure;
+
+//   TIM_HandleTypeDef htim2;
+
+//   htim2.Instance = TIM2;
+//   htim2.Init = TIM_TimeBaseStructure;
+//   htim2.Channel = TIM_CHANNEL_1;
+//   htim2.State = TIM_OUTPUTSTATE_DISABLE;
+
+//   /* Enable the TIM2 clock */
+//   __HAL_RCC_TIM2_CLK_ENABLE();
+
+//   /* Time base configuration */
+//   TIM_TimeBaseStructure.Period = 0xffffffff;
+//   TIM_TimeBaseStructure.Prescaler = 0;
+//   TIM_TimeBaseStructure.ClockDivision = 0;
+//   TIM_TimeBaseStructure.CounterMode =  TIM_COUNTERMODE_UP;
+//   TIM_TimeBaseStructure.RepetitionCounter = 0;
+
+//   //clock TIM2 via ETR pin
+//   TIM_ETR_SetConfig(TIM2, TIM_ETRPRESCALER_DIV1, TIM_ETRPOLARITY_NONINVERTED, 0);
+  
+//   /* Enable capture*/
+//   TIM_ICInitStructure.ICPolarity = TIM_ICPOLARITY_RISING;
+//   TIM_ICInitStructure.ICSelection = TIM_ICSELECTION_TRC;
+//   TIM_ICInitStructure.ICPrescaler = TIM_ICPSC_DIV1;
+//   TIM_ICInitStructure.ICFilter = 0;
+
+//   HAL_TIM_IC_Init(&htim2);
+//   TIM_ICInit(TIM2, &TIM_ICInitStructure);
+
+//   HAL_TIMEx_RemapConfig(TIM2, TIM_TIM2_USBFS_SOF);
+  
+//   /* TIM2 input trigger selection */
+//   TIM_SelectInputTrigger(TIM2, TIM_TS_ITR1);
+//   TIM_SelectSlaveMode(TIM2, TIM_SLAVEMODE_RESET);
+
+//   TIM_OCInitStructure.OCMode = TIM_OCMODE_PWM1;
+//   TIM_OCInitStructure.Pulse = 0x45A1CAC0;  // I/O update pulse length 3 periods
+//   TIM_OCInitStructure.OCPolarity = TIM_OCPOLARITY_LOW;
+//   HAL_TIM_OC_Init(&htim2);
+//   TIM_OC4Init(TIM2, &TIM_OCInitStructure);
+
+//   TIM_Cmd(TIM2, ENABLE);
+// }
+
 /**
  * @brief This function provides accurate delay (in milliseconds) based
  *        on SysTick counter flag.
