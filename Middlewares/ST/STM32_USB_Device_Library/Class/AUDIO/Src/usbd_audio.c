@@ -96,8 +96,8 @@
  * Max packet size: (freq / 1000 + extra_samples) * channels * bytes_per_sample
  * e.g. (48000 / 1000 + 5) * 2(stereo) * 2(16bit) = 212
  */
-#define AUDIO_PACKET_SZE(frq) (uint8_t)(((frq / 1000U) * 2U * 2U) & 0xFFU), \
-                              (uint8_t)((((frq / 1000U) * 2U * 2U) >> 8) & 0xFFU)
+#define AUDIO_PACKET_SZE(frq) (uint8_t)(((frq / 1000U + 1) * 2U * 2U) & 0xFFU), \
+                              (uint8_t)((((frq / 1000U + 1) * 2U * 2U) >> 8) & 0xFFU)
 
 /* 2 channels, 2 bytes per sample, half of buffer => / 8 */
 #define samples_per_halfcplt (uint32_t)(AUDIO_TOTAL_BUF_SIZE / 8)
@@ -851,7 +851,7 @@ static uint8_t USBD_AUDIO_DataOut(USBD_HandleTypeDef* pdev,
     uint32_t rest = AUDIO_TOTAL_BUF_SIZE - curr_pos;
 
     /* Ignore strangely large packets */
-    if (curr_length > 192) {
+    if (curr_length > AUDIO_OUT_PACKET) {
       curr_length = 0U;
     }
 
