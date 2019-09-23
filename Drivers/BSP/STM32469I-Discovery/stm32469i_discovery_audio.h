@@ -272,6 +272,7 @@ void    BSP_AUDIO_OUT_SetAudioFrameSlot(uint32_t AudioFrameSlot);
 uint8_t BSP_AUDIO_OUT_SetMute(uint32_t Cmd);
 uint8_t BSP_AUDIO_OUT_SetOutputMode(uint8_t Output);
 void    BSP_AUDIO_OUT_DeInit(void);
+uint32_t BSP_AUDIO_OUT_GetRemainingDataSize(void);
 
 /* User Callbacks: user has to implement these functions in his code if they are needed. */
 /* This function is called when the requested data has been completely transferred.*/

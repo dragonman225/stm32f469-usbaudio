@@ -98,6 +98,8 @@ Known Limitations:
 /* Includes ------------------------------------------------------------------*/
 #include <string.h>
 #include "stm32469i_discovery_audio.h"
+
+#include "stm32f4xx_ll_dma.h"
 /** @addtogroup BSP
   * @{
   */
@@ -596,6 +598,15 @@ void BSP_AUDIO_OUT_DeInit(void)
  
   /* Reset the audio output context */
   memset(&audio_drv, 0, sizeof(audio_drv));
+}
+
+/**
+ * @brief  Get size of remaining audio data to be transmitted.
+ * @see    STM32F469xx Reference Manual 9.5.6 (p.248)
+ */
+uint32_t BSP_AUDIO_OUT_GetRemainingDataSize(void)
+{
+  return LL_DMA_ReadReg(AUDIO_SAIx_DMAx_STREAM, NDTR) & 0xFFFF;
 }
 
 /**

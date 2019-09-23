@@ -110,6 +110,12 @@
 /* Total size of the audio transfer buffer */
 #define AUDIO_TOTAL_BUF_SIZE                          ((uint16_t)(AUDIO_OUT_PACKET * AUDIO_OUT_PACKET_NUM))
 
+/** 
+ * The minimum distance that the wr_ptr should keep before rd_ptr to 
+ * prevent overwriting unplayed buffer
+ */
+#define AUDIO_BUF_SAFEZONE                            AUDIO_OUT_PACKET
+
     /* Audio Commands enumeration */
 typedef enum
 {
