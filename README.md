@@ -68,6 +68,38 @@ On Debug tab, choose "Debug (OpenOCD)" and start.
 
 * Audio become distorted for several seconds every 5 ~ 6 minutes because this example doesn't use any synchronization method (`bmAttributes` of `Endpoint 1` is set to `0x01` — Transfer type: Isochronous, Synchronization type: undefined. Source: `Middlewares/ST/STM32_USB_Device_Library/Class/AUDIO/Src/usbd_audio.c:300`, Specification: https://www.usb.org/sites/default/files/audio10.pdf p.61)
 
+* Implementing Asynchronous USB audio
+
+  * `PCD_HandleTypeDef->Init->Sof_enable` (`Src/usbd_conf.c:274`) must be 1 to receive SOF interrupt.
+
+  * Monitor asynchronous feedback status
+
+    Change `cardX` to your soundcard.
+
+    ```bash
+    watch -n 0.1 cat /proc/asound/cardX/stream0
+    ```
+
+    Sample information :
+
+    ```
+    Dragonode Audio Venus DAC at usb-0000:00:02.0-3, full speed : USB Audio
+
+    Playback:
+      Status: Running
+        Interface = 1
+        Altset = 1
+        Packet Size = 192
+        Momentary freq = 47996 Hz (0x2f.fedc)
+        Feedback Format = 10.14
+      Interface 1
+        Altset 1
+        Format: S16_LE
+        Channels: 2
+        Endpoint: 1 OUT (ASYNC)
+        Rates: 48000
+    ```
+
 * This project can be used as a template for future STM32F4 projects with some modifications.
 
   * To import a project made for other IDEs :
