@@ -531,8 +531,15 @@ USBD_StatusTypeDef USBD_LL_SOF(USBD_HandleTypeDef  *pdev)
 USBD_StatusTypeDef USBD_LL_IsoINIncomplete(USBD_HandleTypeDef  *pdev, uint8_t epnum)
 {
   /* Prevent unused arguments compilation warning */
-  UNUSED(pdev);
-  UNUSED(epnum);
+  // UNUSED(pdev);
+  // UNUSED(epnum);
+  if(pdev->dev_state == USBD_STATE_CONFIGURED)
+  {
+    if(pdev->pClass->IsoINIncomplete != NULL)
+    {
+      pdev->pClass->IsoINIncomplete(pdev, epnum);
+    }
+  }
 
   return USBD_OK;
 }
@@ -546,8 +553,15 @@ USBD_StatusTypeDef USBD_LL_IsoINIncomplete(USBD_HandleTypeDef  *pdev, uint8_t ep
 USBD_StatusTypeDef USBD_LL_IsoOUTIncomplete(USBD_HandleTypeDef  *pdev, uint8_t epnum)
 {
   /* Prevent unused arguments compilation warning */
-  UNUSED(pdev);
-  UNUSED(epnum);
+  // UNUSED(pdev);
+  // UNUSED(epnum);
+  if(pdev->dev_state == USBD_STATE_CONFIGURED)
+  {
+    if(pdev->pClass->IsoOUTIncomplete != NULL)
+    {
+      pdev->pClass->IsoOUTIncomplete(pdev, epnum);
+    }
+  }
 
   return USBD_OK;
 }

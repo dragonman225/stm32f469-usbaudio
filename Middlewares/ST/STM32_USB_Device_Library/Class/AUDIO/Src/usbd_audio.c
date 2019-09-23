@@ -95,8 +95,11 @@
  * Max packet size: (freq / 1000 + extra_samples) * channels * bytes_per_sample
  * e.g. (48000 / 1000 + 5) * 2(stereo) * 2(16bit) = 212
  */
-#define AUDIO_PACKET_SZE(frq) (uint8_t)(((frq / 1000U + 5) * 2U * 2U) & 0xFFU), \
-                              (uint8_t)((((frq / 1000U + 5) * 2U * 2U) >> 8) & 0xFFU)
+#define AUDIO_PACKET_SZE(frq) (uint8_t)(((frq / 1000U) * 2U * 2U) & 0xFFU), \
+                              (uint8_t)((((frq / 1000U) * 2U * 2U) >> 8) & 0xFFU)
+
+/* 2 channels, 2 bytes per sample, half of buffer => / 8 */
+#define samples_per_halfcplt (uint32_t)(AUDIO_TOTAL_BUF_SIZE / 8)
 
 /**
   * @}
@@ -210,8 +213,8 @@ __ALIGN_BEGIN static uint8_t USBD_AUDIO_CfgDesc[USB_AUDIO_CONFIG_DESC_SIZ] __ALI
         0x01,                            /* wTerminalType AUDIO_TERMINAL_USB_STREAMING   0x0101 */
         0x01,
         0x00, /* bAssocTerminal */
-        0x01, /* bNrChannels */
-        0x00, /* wChannelConfig 0x0000  Mono */
+        0x02, /* bNrChannels */
+        0x03, /* wChannelConfig 0x0003  FL FR */
         0x00,
         0x00, /* iChannelNames */
         0x00, /* iTerminal */
@@ -277,14 +280,14 @@ __ALIGN_BEGIN static uint8_t USBD_AUDIO_CfgDesc[USB_AUDIO_CONFIG_DESC_SIZ] __ALI
         0x00,
         /* 07 byte*/
 
-        /* USB Speaker Audio Type III Format Interface Descriptor */
+        /* USB Speaker Audio Type I Format Interface Descriptor */
         0x0B,                               /* bLength */
         AUDIO_INTERFACE_DESCRIPTOR_TYPE,    /* bDescriptorType */
         AUDIO_STREAMING_FORMAT_TYPE,        /* bDescriptorSubtype */
         AUDIO_FORMAT_TYPE_I,                /* bFormatType */
         0x02,                               /* bNrChannels */
         0x02,                               /* bSubFrameSize :  2 Bytes per frame (16bits) */
-        16,                                 /* bBitResolution (16-bits per sample) */
+        0x10,                               /* bBitResolution (16-bits per sample) */
         0x01,                               /* bSamFreqType only one frequency supported */
         AUDIO_SAMPLE_FREQ(USBD_AUDIO_FREQ), /* Audio sampling frequency coded on 3 bytes */
         /* 11 byte*/
@@ -304,7 +307,7 @@ __ALIGN_BEGIN static uint8_t USBD_AUDIO_CfgDesc[USB_AUDIO_CONFIG_DESC_SIZ] __ALI
         AUDIO_STREAMING_ENDPOINT_DESC_SIZE, /* bLength */
         AUDIO_ENDPOINT_DESCRIPTOR_TYPE,     /* bDescriptorType */
         AUDIO_ENDPOINT_GENERAL,             /* bDescriptor */
-        0x01,                               /* bmAttributes - Sampling Frequency control is supported. See UAC Spec 1.0 p.62 */
+        0x00,                               /* bmAttributes - Sampling Frequency control is supported (not implemented). See UAC Spec 1.0 p.62 */
         0x00,                               /* bLockDelayUnits */
         0x00,                               /* wLockDelay */
         0x00,
@@ -314,15 +317,18 @@ __ALIGN_BEGIN static uint8_t USBD_AUDIO_CfgDesc[USB_AUDIO_CONFIG_DESC_SIZ] __ALI
         AUDIO_STANDARD_ENDPOINT_DESC_SIZE, /* bLength */
         USB_DESC_TYPE_ENDPOINT,            /* bDescriptorType */
         AUDIO_IN_EP,                       /* bEndpointAddress */
-        0x01,                              /* bmAttributes */
+        0x11,                              /* bmAttributes */
         0x03, 0x00,                        /* wMaxPacketSize in Bytes */
         0x01,                              /* bInterval 1ms */
         SOF_RATE,                          /* bRefresh 4ms = 2^2 */
         0x00,                              /* bSynchAddress */
-        /* 09 byte*/
+                                           /* 09 byte*/
 };
 
-/* USB Standard Device Descriptor */
+/** 
+ * USB Standard Device Descriptor
+ * @see https://www.keil.com/pack/doc/mw/USB/html/_u_s_b__device__qualifier__descriptor.html
+ */
 __ALIGN_BEGIN static uint8_t USBD_AUDIO_DeviceQualifierDesc[USB_LEN_DEV_QUALIFIER_DESC] __ALIGN_END =
     {
         USB_LEN_DEV_QUALIFIER_DESC,
@@ -336,6 +342,12 @@ __ALIGN_BEGIN static uint8_t USBD_AUDIO_DeviceQualifierDesc[USB_LEN_DEV_QUALIFIE
         0x01,
         0x00,
 };
+
+uint32_t volatile sof_count = 0;
+uint32_t volatile audio_out_halfcplt_count = 0;
+uint32_t volatile tx_flag = 0;
+uint32_t volatile is_playing = 0;
+uint32_t volatile fnsof = 0;
 
 /**
   * @}
@@ -364,6 +376,8 @@ static uint8_t USBD_AUDIO_Init(USBD_HandleTypeDef* pdev, uint8_t cfgidx)
   USBD_LL_OpenEP(pdev, AUDIO_IN_EP, USBD_EP_TYPE_ISOC, 3);
   pdev->ep_in[AUDIO_IN_EP & 0xFU].is_used = 1U;
 
+  USBD_LL_FlushEP(pdev, AUDIO_IN_EP);
+
   /* Allocate Audio structure */
   pdev->pClassData = USBD_malloc(sizeof(USBD_AUDIO_HandleTypeDef));
 
@@ -382,9 +396,15 @@ static uint8_t USBD_AUDIO_Init(USBD_HandleTypeDef* pdev, uint8_t cfgidx)
       return USBD_FAIL;
     }
 
+    /** 
+     * Set tx_flag 1 to block feedback transmission in SOF handler when 
+     * things are not ready.
+     */
+    tx_flag = 1U;
+
     /* Prepare Out endpoint to receive 1st packet */
-    USBD_LL_PrepareReceive(pdev, AUDIO_OUT_EP, haudio->buffer,
-                           AUDIO_OUT_PACKET);
+    // USBD_LL_PrepareReceive(pdev, AUDIO_OUT_EP, haudio->buffer,
+    //                        AUDIO_OUT_PACKET);
   }
   return USBD_OK;
 }
@@ -399,9 +419,18 @@ static uint8_t USBD_AUDIO_Init(USBD_HandleTypeDef* pdev, uint8_t cfgidx)
 static uint8_t USBD_AUDIO_DeInit(USBD_HandleTypeDef* pdev,
                                  uint8_t cfgidx)
 {
-  /* Open EP OUT */
+  USBD_LL_FlushEP(pdev, AUDIO_OUT_EP);
+  USBD_LL_FlushEP(pdev, AUDIO_IN_EP);
+
+  /* Close EP OUT */
   USBD_LL_CloseEP(pdev, AUDIO_OUT_EP);
   pdev->ep_out[AUDIO_OUT_EP & 0xFU].is_used = 0U;
+
+  /* Close EP IN */
+  USBD_LL_CloseEP(pdev, AUDIO_IN_EP);
+  pdev->ep_in[AUDIO_IN_EP & 0xFU].is_used = 0U;
+
+  tx_flag = 0U;
 
   /* DeInit  physical Interface components */
   if (pdev->pClassData != NULL) {
@@ -432,6 +461,7 @@ static uint8_t USBD_AUDIO_Setup(USBD_HandleTypeDef* pdev,
   haudio = (USBD_AUDIO_HandleTypeDef*)pdev->pClassData;
 
   switch (req->bmRequest & USB_REQ_TYPE_MASK) {
+    /* AUDIO Class Requests */
     case USB_REQ_TYPE_CLASS:
       switch (req->bRequest) {
         case AUDIO_REQ_GET_CUR:
@@ -449,6 +479,7 @@ static uint8_t USBD_AUDIO_Setup(USBD_HandleTypeDef* pdev,
       }
       break;
 
+    /* Standard Requests */
     case USB_REQ_TYPE_STANDARD:
       switch (req->bRequest) {
         case USB_REQ_GET_STATUS:
@@ -482,6 +513,18 @@ static uint8_t USBD_AUDIO_Setup(USBD_HandleTypeDef* pdev,
           if (pdev->dev_state == USBD_STATE_CONFIGURED) {
             if ((uint8_t)(req->wValue) <= USBD_MAX_NUM_INTERFACES) {
               haudio->alt_setting = (uint8_t)(req->wValue);
+              /**
+               * Set tx_flag 0 to allow feedback transmission when setup 
+               * ready.
+               */
+              if (haudio->alt_setting == 1U) {
+                sof_count = 0U;
+                tx_flag = 0U;
+              }
+              if (haudio->alt_setting == 0U) {
+                tx_flag = 0U;
+              }
+              USBD_LL_FlushEP(pdev, AUDIO_IN_EP);
             } else {
               /* Call the error management function (command will be nacked */
               USBD_CtlError(pdev, req);
@@ -531,7 +574,15 @@ static uint8_t* USBD_AUDIO_GetCfgDesc(uint16_t* length)
 static uint8_t USBD_AUDIO_DataIn(USBD_HandleTypeDef* pdev,
                                  uint8_t epnum)
 {
-  /* Only OUT data are processed */
+  /* bEndpointAddress[7] is 1 for IN endpoint. See UAC 1.0 spec, p.61 */
+  if (epnum == (AUDIO_IN_EP & 0x7f)) {
+    tx_flag = 0U;
+    /** 
+     * Do not clear sof_count or it will never reach desired 
+     * feedback-update-period set in SOF handler.
+     */
+    //sof_count = 0U;
+  }
   return USBD_OK;
 }
 
@@ -576,6 +627,74 @@ static uint8_t USBD_AUDIO_EP0_TxReady(USBD_HandleTypeDef* pdev)
   */
 static uint8_t USBD_AUDIO_SOF(USBD_HandleTypeDef* pdev)
 {
+  USBD_AUDIO_HandleTypeDef* haudio;
+  haudio = (USBD_AUDIO_HandleTypeDef*)pdev->pClassData;
+
+  /* Order of 3 bytes of 10.14 format: { LO byte, MID byte, HI byte } */
+  //uint8_t fb_data[3] = {0x00, 0xC0, 0x2F};
+
+  /* 10.14 converter 30.00 -> C0.00 */
+  /**
+   * 1. Must be static so that the value is kept when function is not called.
+   * 2. Must be volatile so that it can survive compiler optimization.
+   */
+  static volatile uint32_t fb_value = 0x2FC00000 >> 2;
+
+  if (haudio->rd_enable == 1U) {
+    // if (remain_buf < AUDIO_TOTAL_BUF_SIZE / 4)
+    //   fb_value = 0x2E600000 >> 2;
+    // else if (remain_buf < AUDIO_TOTAL_BUF_SIZE / 2)
+    //   fb_value = 0x2F000000 >> 2;
+    // else if (remain_buf < AUDIO_TOTAL_BUF_SIZE * 3 / 4)
+    //   fb_value = 0x2FC00000 >> 2;
+    // else if (remain_buf < AUDIO_TOTAL_BUF_SIZE)
+    //   fb_value = 0x30000000 >> 2;
+
+    //fb_raw = (uint32_t)(((float)48U / (float)AUDIO_TOTAL_BUF_SIZE) * (float)remain_buf);
+    //fb_raw = 100U * remain_buf / AUDIO_TOTAL_BUF_SIZE;
+
+    // if (fb_sent == 0U) {
+    //   USBD_LL_Transmit(pdev, AUDIO_IN_EP, fb_data, 3U);
+    //   fb_sent = 1U;
+    // }
+
+    sof_count += 1;
+
+    if (sof_count == 32U) {
+      // fb_raw = audio_out_halfcplt_count * samples_per_halfcplt / sof_count;
+      // fb_value = fb_raw << 22;
+
+      // if (((haudio->rd_ptr == 0U) && (haudio->wr_ptr < AUDIO_TOTAL_BUF_SIZE / 2U)) || ((haudio->rd_ptr == AUDIO_TOTAL_BUF_SIZE / 2U) && (haudio->wr_ptr > AUDIO_TOTAL_BUF_SIZE / 2U))) {
+      //   fb_value = 0x30000000 >> 2;
+      // } else {
+      //   fb_value = 0x2F000000 >> 2;
+      // }
+      if (fb_value == (0x2E600000 >> 2))
+        fb_value = 0x2FC00000 >> 2;
+      else
+        fb_value = 0x2E600000 >> 2;
+
+      sof_count = 0U;
+    }
+
+    if (tx_flag == 0U) {
+      /* Get FNSOF, use volatile since its address is mapped to a hardware register. */
+      USB_OTG_GlobalTypeDef* USBx = USB_OTG_FS;
+      uint32_t USBx_BASE = (uint32_t)USBx;
+      uint32_t volatile fnsof_new = (USBx_DEVICE->DSTS & USB_OTG_DSTS_FNSOF) >> 8;
+
+      uint8_t fb_data_2[3] = {(fb_value & 0x0000FF00) >> 8, (fb_value & 0x00FF0000) >> 16, (fb_value & 0xFF000000) >> 24};
+
+      //if ((fnsof & 0x1) == (fnsof_new & 0x1)) {
+      if (1) {
+        USBD_LL_Transmit(pdev, AUDIO_IN_EP, fb_data_2, 3U);
+
+        /* Block transmission until it's finished. */
+        tx_flag = 1U;
+      }
+    }
+  }
+
   return USBD_OK;
 }
 
@@ -587,44 +706,68 @@ static uint8_t USBD_AUDIO_SOF(USBD_HandleTypeDef* pdev)
   */
 void USBD_AUDIO_Sync(USBD_HandleTypeDef* pdev, AUDIO_OffsetTypeDef offset)
 {
-  uint32_t cmd = 0U;
   USBD_AUDIO_HandleTypeDef* haudio;
   haudio = (USBD_AUDIO_HandleTypeDef*)pdev->pClassData;
 
-  haudio->offset = offset;
+  audio_out_halfcplt_count += 1;
 
   if (haudio->rd_enable == 1U) {
-    haudio->rd_ptr += (uint16_t)(AUDIO_TOTAL_BUF_SIZE / 2U);
-
-    if (haudio->rd_ptr == AUDIO_TOTAL_BUF_SIZE) {
-      /* roll back */
+    if (offset == AUDIO_OFFSET_HALF) {
+      haudio->rd_ptr = AUDIO_TOTAL_BUF_SIZE / 2U;
+    } else {
       haudio->rd_ptr = 0U;
     }
   }
 
-  if (haudio->rd_ptr > haudio->wr_ptr) {
-    if ((haudio->rd_ptr - haudio->wr_ptr) < AUDIO_OUT_PACKET) {
-      cmd = AUDIO_TOTAL_BUF_SIZE / 2U + 4U;
-    } else {
-      if ((haudio->rd_ptr - haudio->wr_ptr) > (AUDIO_TOTAL_BUF_SIZE - AUDIO_OUT_PACKET)) {
-        cmd = AUDIO_TOTAL_BUF_SIZE / 2U - 4U;
-      }
-    }
-  } else {
-    if ((haudio->wr_ptr - haudio->rd_ptr) < AUDIO_OUT_PACKET) {
-      cmd = AUDIO_TOTAL_BUF_SIZE / 2U - 4U;
-    } else {
-      if ((haudio->wr_ptr - haudio->rd_ptr) > (AUDIO_TOTAL_BUF_SIZE - AUDIO_OUT_PACKET)) {
-        cmd = AUDIO_TOTAL_BUF_SIZE / 2U + 4U;
-      }
-    }
-  }
+  // uint32_t cmd = 0U;
+  // USBD_AUDIO_HandleTypeDef* haudio;
+  // haudio = (USBD_AUDIO_HandleTypeDef*)pdev->pClassData;
 
-  if (haudio->offset == AUDIO_OFFSET_FULL) {
-    ((USBD_AUDIO_ItfTypeDef*)pdev->pUserData)->AudioCmd(&haudio->buffer[0], cmd, AUDIO_CMD_PLAY);
-    haudio->offset = AUDIO_OFFSET_NONE;
-  }
+  // haudio->offset = offset;
+
+  // if (haudio->rd_enable == 1U) {
+  //   haudio->rd_ptr += (uint16_t)(AUDIO_TOTAL_BUF_SIZE / 2U);
+
+  //   if (haudio->rd_ptr == AUDIO_TOTAL_BUF_SIZE) {
+  //     /* roll back */
+  //     haudio->rd_ptr = 0U;
+  //   }
+  // }
+
+  // if (haudio->rd_ptr > haudio->wr_ptr) {
+  //   if ((haudio->rd_ptr - haudio->wr_ptr) < AUDIO_OUT_PACKET) {
+  //     cmd = AUDIO_TOTAL_BUF_SIZE / 2U + 4U;
+  //   } else {
+  //     if ((haudio->rd_ptr - haudio->wr_ptr) > (AUDIO_TOTAL_BUF_SIZE - AUDIO_OUT_PACKET)) {
+  //       cmd = AUDIO_TOTAL_BUF_SIZE / 2U - 4U;
+  //     }
+  //   }
+  // } else {
+  //   if ((haudio->wr_ptr - haudio->rd_ptr) < AUDIO_OUT_PACKET) {
+  //     cmd = AUDIO_TOTAL_BUF_SIZE / 2U - 4U;
+  //   } else {
+  //     if ((haudio->wr_ptr - haudio->rd_ptr) > (AUDIO_TOTAL_BUF_SIZE - AUDIO_OUT_PACKET)) {
+  //       cmd = AUDIO_TOTAL_BUF_SIZE / 2U + 4U;
+  //     }
+  //   }
+  // }
+
+  // if (haudio->offset == AUDIO_OFFSET_FULL) {
+  //   ((USBD_AUDIO_ItfTypeDef*)pdev->pUserData)->AudioCmd(&haudio->buffer[0], cmd, AUDIO_CMD_PLAY);
+  //   haudio->offset = AUDIO_OFFSET_NONE;
+  // }
 }
+
+/**
+ * !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ * USBD_AUDIO_IsoINIncomplete & USBD_AUDIO_IsoOutIncomplete are not 
+ * enabled by default.
+ * 
+ * Go to Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_core.c
+ * Fill in USBD_LL_IsoINIncomplete and USBD_LL_IsoOUTIncomplete with 
+ * actual handler functions.
+ * !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ */
 
 /**
   * @brief  USBD_AUDIO_IsoINIncomplete
@@ -635,6 +778,15 @@ void USBD_AUDIO_Sync(USBD_HandleTypeDef* pdev, AUDIO_OffsetTypeDef offset)
   */
 static uint8_t USBD_AUDIO_IsoINIncomplete(USBD_HandleTypeDef* pdev, uint8_t epnum)
 {
+  USB_OTG_GlobalTypeDef* USBx = USB_OTG_FS;
+  uint32_t USBx_BASE = (uint32_t)USBx;
+  fnsof = (USBx_DEVICE->DSTS & USB_OTG_DSTS_FNSOF) >> 8;
+
+  if (tx_flag == 1U) {
+    tx_flag = 0U;
+    USBD_LL_FlushEP(pdev, AUDIO_IN_EP);
+  }
+
   return USBD_OK;
 }
 /**
@@ -661,30 +813,78 @@ static uint8_t USBD_AUDIO_DataOut(USBD_HandleTypeDef* pdev,
   USBD_AUDIO_HandleTypeDef* haudio;
   haudio = (USBD_AUDIO_HandleTypeDef*)pdev->pClassData;
 
+  static uint8_t tmpbuf[1024];
+
   if (epnum == AUDIO_OUT_EP) {
-    /* Increment the Buffer pointer or roll it back when all buffers are full */
+    uint32_t curr_length = USBD_GetRxCount(pdev, epnum);
+    uint32_t curr_pos = haudio->wr_ptr;
+    uint32_t rest = AUDIO_TOTAL_BUF_SIZE - curr_pos;
 
-    haudio->wr_ptr += AUDIO_OUT_PACKET;
+    /* Ignore strangely large packets */
+    if (curr_length > 192) {
+      curr_length = 0U;
+    }
 
-    if (haudio->wr_ptr == AUDIO_TOTAL_BUF_SIZE) {
-      /* All buffers are full: roll back */
-      haudio->wr_ptr = 0U;
+    if (rest < curr_length) {
+      if (rest > 0U) {
+        memcpy(&haudio->buffer[curr_pos], tmpbuf, rest);
+        curr_length -= rest;
+      }
+      if (curr_length > 0U) {
+        memcpy(&haudio->buffer[0], &tmpbuf[rest], curr_length);
+        haudio->wr_ptr = curr_length;
+      }
+    } else {
+      if (curr_length > 0U) {
+        memcpy(&haudio->buffer[curr_pos], tmpbuf, curr_length);
+        haudio->wr_ptr += curr_length;
+      }
+    }
 
-      if (haudio->offset == AUDIO_OFFSET_UNKNOWN) {
+    /* Start playing when half of the audio buffer is filled */
+    if (haudio->wr_ptr >= AUDIO_TOTAL_BUF_SIZE / 2U) {
+      if (haudio->offset == AUDIO_OFFSET_UNKNOWN && is_playing == 0U) {
+        is_playing = 1U;
+
         ((USBD_AUDIO_ItfTypeDef*)pdev->pUserData)->AudioCmd(&haudio->buffer[0], AUDIO_TOTAL_BUF_SIZE / 2U, AUDIO_CMD_START);
         haudio->offset = AUDIO_OFFSET_NONE;
+
+        if (haudio->rd_enable == 0U) {
+          haudio->rd_enable = 1U;
+        }
       }
     }
 
-    if (haudio->rd_enable == 0U) {
-      if (haudio->wr_ptr == (AUDIO_TOTAL_BUF_SIZE / 2U)) {
-        haudio->rd_enable = 1U;
-      }
+    /* Rollback if reach end of buffer */
+    if (haudio->wr_ptr >= AUDIO_TOTAL_BUF_SIZE) {
+      haudio->wr_ptr = 0U;
     }
+
+    USBD_LL_PrepareReceive(pdev, AUDIO_OUT_EP, tmpbuf, AUDIO_OUT_PACKET);
+
+    /* Increment the Buffer pointer or roll it back when all buffers are full */
+
+    // haudio->wr_ptr += AUDIO_OUT_PACKET;
+
+    // if (haudio->wr_ptr == AUDIO_TOTAL_BUF_SIZE) {
+    //   /* All buffers are full: roll back */
+    //   haudio->wr_ptr = 0U;
+
+    //   if (haudio->offset == AUDIO_OFFSET_UNKNOWN) {
+    //     ((USBD_AUDIO_ItfTypeDef*)pdev->pUserData)->AudioCmd(&haudio->buffer[0], AUDIO_TOTAL_BUF_SIZE / 2U, AUDIO_CMD_START);
+    //     haudio->offset = AUDIO_OFFSET_NONE;
+    //   }
+    // }
+
+    // if (haudio->rd_enable == 0U) {
+    //   if (haudio->wr_ptr == (AUDIO_TOTAL_BUF_SIZE / 2U)) {
+    //     haudio->rd_enable = 1U;
+    //   }
+    // }
 
     /* Prepare Out endpoint to receive next audio packet */
-    USBD_LL_PrepareReceive(pdev, AUDIO_OUT_EP, &haudio->buffer[haudio->wr_ptr],
-                           AUDIO_OUT_PACKET);
+    // USBD_LL_PrepareReceive(pdev, AUDIO_OUT_EP, &haudio->buffer[haudio->wr_ptr],
+    //                        AUDIO_OUT_PACKET);
   }
 
   return USBD_OK;
