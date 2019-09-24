@@ -344,11 +344,10 @@ __ALIGN_BEGIN static uint8_t USBD_AUDIO_DeviceQualifierDesc[USB_LEN_DEV_QUALIFIE
         0x00,
 };
 
-uint32_t volatile sof_count = 0;
-uint32_t volatile audio_out_halfcplt_count = 0;
-uint32_t volatile tx_flag = 0;
-uint32_t volatile is_playing = 0;
-uint32_t volatile fnsof = 0;
+volatile uint32_t sof_count = 0;
+volatile uint32_t tx_flag = 0;
+volatile uint32_t is_playing = 0;
+volatile uint32_t fnsof = 0;
 
 /**
   * @}
@@ -377,6 +376,7 @@ static uint8_t USBD_AUDIO_Init(USBD_HandleTypeDef* pdev, uint8_t cfgidx)
   USBD_LL_OpenEP(pdev, AUDIO_IN_EP, USBD_EP_TYPE_ISOC, 3);
   pdev->ep_in[AUDIO_IN_EP & 0xFU].is_used = 1U;
 
+  /* Flush feedback endpoint */
   USBD_LL_FlushEP(pdev, AUDIO_IN_EP);
 
   /* Allocate Audio structure */
@@ -399,7 +399,7 @@ static uint8_t USBD_AUDIO_Init(USBD_HandleTypeDef* pdev, uint8_t cfgidx)
 
     /** 
      * Set tx_flag 1 to block feedback transmission in SOF handler when 
-     * things are not ready.
+     * device is not ready.
      */
     tx_flag = 1U;
 
@@ -420,6 +420,7 @@ static uint8_t USBD_AUDIO_Init(USBD_HandleTypeDef* pdev, uint8_t cfgidx)
 static uint8_t USBD_AUDIO_DeInit(USBD_HandleTypeDef* pdev,
                                  uint8_t cfgidx)
 {
+  /* Flush all endpoints */
   USBD_LL_FlushEP(pdev, AUDIO_OUT_EP);
   USBD_LL_FlushEP(pdev, AUDIO_IN_EP);
 
@@ -431,9 +432,10 @@ static uint8_t USBD_AUDIO_DeInit(USBD_HandleTypeDef* pdev,
   USBD_LL_CloseEP(pdev, AUDIO_IN_EP);
   pdev->ep_in[AUDIO_IN_EP & 0xFU].is_used = 0U;
 
+  /* Clear feedback transmission flag */
   tx_flag = 0U;
 
-  /* DeInit  physical Interface components */
+  /* DeInit physical Interface components */
   if (pdev->pClassData != NULL) {
     ((USBD_AUDIO_ItfTypeDef*)pdev->pUserData)->DeInit(0U);
     USBD_free(pdev->pClassData);
@@ -515,8 +517,8 @@ static uint8_t USBD_AUDIO_Setup(USBD_HandleTypeDef* pdev,
             if ((uint8_t)(req->wValue) <= USBD_MAX_NUM_INTERFACES) {
               haudio->alt_setting = (uint8_t)(req->wValue);
               /**
-               * Set tx_flag 0 to allow feedback transmission when setup 
-               * ready.
+               * Set tx_flag 0 to allow feedback transmission when device 
+               * is ready.
                */
               if (haudio->alt_setting == 1U) {
                 sof_count = 0U;
@@ -575,14 +577,9 @@ static uint8_t* USBD_AUDIO_GetCfgDesc(uint16_t* length)
 static uint8_t USBD_AUDIO_DataIn(USBD_HandleTypeDef* pdev,
                                  uint8_t epnum)
 {
-  /* bEndpointAddress[7] is 1 for IN endpoint. See UAC 1.0 spec, p.61 */
-  if (epnum == (AUDIO_IN_EP & 0x7f)) {
+  /* epnum is the lowest 4 bits of bEndpointAddress. See UAC 1.0 spec, p.61 */
+  if (epnum == (AUDIO_IN_EP & 0xf)) {
     tx_flag = 0U;
-    /** 
-     * Do not clear sof_count or it will never reach desired 
-     * feedback-update-period set in SOF handler.
-     */
-    //sof_count = 0U;
   }
   return USBD_OK;
 }
@@ -609,6 +606,7 @@ static uint8_t USBD_AUDIO_EP0_RxReady(USBD_HandleTypeDef* pdev)
 
   return USBD_OK;
 }
+
 /**
   * @brief  USBD_AUDIO_EP0_TxReady
   *         handle EP0 TRx Ready event
@@ -620,6 +618,7 @@ static uint8_t USBD_AUDIO_EP0_TxReady(USBD_HandleTypeDef* pdev)
   /* Only OUT control data are processed */
   return USBD_OK;
 }
+
 /**
   * @brief  USBD_AUDIO_SOF
   *         handle SOF event
@@ -631,37 +630,26 @@ static uint8_t USBD_AUDIO_SOF(USBD_HandleTypeDef* pdev)
   USBD_AUDIO_HandleTypeDef* haudio;
   haudio = (USBD_AUDIO_HandleTypeDef*)pdev->pClassData;
 
-  /* Order of 3 bytes of 10.14 format: { LO byte, MID byte, HI byte } */
-  //uint8_t fb_data[3] = {0x00, 0xC0, 0x2F};
-
-  /* 10.14 converter 30.00 -> C0.00 */
   /**
-   * 1. Must be static so that the value is kept when function is not called.
-   * 2. Must be volatile so that it can survive compiler optimization.
+   * Order of 3 bytes in feedback packet: { LO byte, MID byte, HI byte }
+   * 
+   * For example,
+   * 48.000(dec) => 300000(hex, 8.16) => 0C0000(hex, 10.14) => transmit { 00, 00, 0C }
+   * 
+   * Note that ALSA accepts 8.16 format.
    */
-  static volatile uint32_t fb_value = 0x2FC00000 >> 2;
+
+  /**
+   * 1. Must be static so that the values are kept when the function is 
+   *    again called.
+   * 2. Must be volatile so that it will not be optimized out by the compiler.
+   */
+  static volatile uint32_t fb_value = 0x30000000 >> 2;
   static volatile uint32_t audio_buf_writable_size_last = AUDIO_TOTAL_BUF_SIZE / 2U;
-  static volatile int32_t fb_raw = 0x2FC00000 >> 2;
+  static volatile int32_t fb_raw = 0x30000000 >> 2;
 
   /* Do stuff only when playing */
   if (haudio->rd_enable == 1U) {
-    // if (remain_buf < AUDIO_TOTAL_BUF_SIZE / 4)
-    //   fb_value = 0x2E600000 >> 2;
-    // else if (remain_buf < AUDIO_TOTAL_BUF_SIZE / 2)
-    //   fb_value = 0x2F000000 >> 2;
-    // else if (remain_buf < AUDIO_TOTAL_BUF_SIZE * 3 / 4)
-    //   fb_value = 0x2FC00000 >> 2;
-    // else if (remain_buf < AUDIO_TOTAL_BUF_SIZE)
-    //   fb_value = 0x30000000 >> 2;
-
-    //fb_raw = (uint32_t)(((float)48U / (float)AUDIO_TOTAL_BUF_SIZE) * (float)remain_buf);
-    //fb_raw = 100U * remain_buf / AUDIO_TOTAL_BUF_SIZE;
-
-    // if (fb_sent == 0U) {
-    //   USBD_LL_Transmit(pdev, AUDIO_IN_EP, fb_data, 3U);
-    //   fb_sent = 1U;
-    // }
-
     /* Calculate remaining writable buffer */
     uint32_t audio_buf_writable_size;
     haudio->rd_ptr = AUDIO_TOTAL_BUF_SIZE - BSP_AUDIO_OUT_GetRemainingDataSize();
@@ -684,26 +672,12 @@ static uint8_t USBD_AUDIO_SOF(USBD_HandleTypeDef* pdev)
     fb_raw += audio_buf_writable_size_change * 10000;
     fb_value = (uint32_t)fb_raw;
 
-    /* Update last buffer writable size */
+    /* Update last audio buffer writable size */
     audio_buf_writable_size_last = audio_buf_writable_size;
 
     sof_count += 1;
 
     if (sof_count == 32U) {
-      // fb_raw = audio_out_halfcplt_count * samples_per_halfcplt / sof_count;
-      // fb_value = fb_raw << 22;
-
-      // if (((haudio->rd_ptr == 0U) && (haudio->wr_ptr < AUDIO_TOTAL_BUF_SIZE / 2U)) || ((haudio->rd_ptr == AUDIO_TOTAL_BUF_SIZE / 2U) && (haudio->wr_ptr > AUDIO_TOTAL_BUF_SIZE / 2U))) {
-      //   fb_value = 0x30000000 >> 2;
-      // } else {
-      //   fb_value = 0x2F000000 >> 2;
-      // }
-
-      // if (fb_value >= (0x30000000 >> 2))
-      //   fb_value = 0x2E600000 >> 2;
-      // else
-      //   fb_value += 0x1000;
-
       sof_count = 0U;
     }
 
@@ -736,19 +710,6 @@ static uint8_t USBD_AUDIO_SOF(USBD_HandleTypeDef* pdev)
   */
 void USBD_AUDIO_Sync(USBD_HandleTypeDef* pdev, AUDIO_OffsetTypeDef offset)
 {
-  USBD_AUDIO_HandleTypeDef* haudio;
-  haudio = (USBD_AUDIO_HandleTypeDef*)pdev->pClassData;
-
-  // audio_out_halfcplt_count += 1;
-
-  // if (haudio->rd_enable == 1U) {
-  //   if (offset == AUDIO_OFFSET_HALF) {
-  //     haudio->rd_ptr = AUDIO_TOTAL_BUF_SIZE / 2U;
-  //   } else {
-  //     haudio->rd_ptr = 0U;
-  //   }
-  // }
-
   // uint32_t cmd = 0U;
   // USBD_AUDIO_HandleTypeDef* haudio;
   // haudio = (USBD_AUDIO_HandleTypeDef*)pdev->pClassData;
@@ -789,14 +750,14 @@ void USBD_AUDIO_Sync(USBD_HandleTypeDef* pdev, AUDIO_OffsetTypeDef offset)
 }
 
 /**
- * !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ * !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
  * USBD_AUDIO_IsoINIncomplete & USBD_AUDIO_IsoOutIncomplete are not 
  * enabled by default.
  * 
  * Go to Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_core.c
  * Fill in USBD_LL_IsoINIncomplete and USBD_LL_IsoOUTIncomplete with 
  * actual handler functions.
- * !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ * !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
  */
 
 /**
@@ -819,6 +780,7 @@ static uint8_t USBD_AUDIO_IsoINIncomplete(USBD_HandleTypeDef* pdev, uint8_t epnu
 
   return USBD_OK;
 }
+
 /**
   * @brief  USBD_AUDIO_IsoOutIncomplete
   *         handle data ISO OUT Incomplete event
@@ -830,6 +792,7 @@ static uint8_t USBD_AUDIO_IsoOutIncomplete(USBD_HandleTypeDef* pdev, uint8_t epn
 {
   return USBD_OK;
 }
+
 /**
   * @brief  USBD_AUDIO_DataOut
   *         handle data OUT Stage
