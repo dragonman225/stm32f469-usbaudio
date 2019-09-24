@@ -22,7 +22,7 @@ TARGET = f469-usbaudio-ex2
 # debug build?
 DEBUG = 1
 # optimization
-OPT = #-Og
+OPT = -Og
 
 #######################################
 # paths
