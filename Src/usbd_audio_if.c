@@ -73,14 +73,6 @@ USBD_AUDIO_ItfTypeDef USBD_AUDIO_fops = {
 
 /* Private functions ---------------------------------------------------------*/
 
-static uint32_t is_playing(uint16_t sample)
-{
-  if (sample)
-    return 1;
-  else
-    return 0;
-}
-
 /**
  * @brief  Initializes the AUDIO media low layer.
  * @param  AudioFreq: Audio frequency used to play the audio stream.
@@ -125,12 +117,12 @@ static int8_t Audio_PlaybackCmd(uint8_t* pbuf, uint32_t size, uint8_t cmd)
   switch (cmd) {
     case AUDIO_CMD_START:
       BSP_AUDIO_OUT_Play((uint16_t*)pbuf, 2 * size);
-      playing = is_playing(((uint16_t*)pbuf)[0]);
+      playing = 1U;
       break;
 
     case AUDIO_CMD_PLAY:
       BSP_AUDIO_OUT_ChangeBuffer((uint16_t*)pbuf, 2 * size);
-      playing = is_playing(((uint16_t*)pbuf)[0]);
+      playing = 1U;
       break;
   }
   return 0;
