@@ -56,7 +56,7 @@
 
 #define SOF_RATE                                      0x02U
 
-#define USB_AUDIO_CONFIG_DESC_SIZ                     0x76U
+#define USB_AUDIO_CONFIG_DESC_SIZ                     0x7CU
 #define AUDIO_INTERFACE_DESC_SIZE                     0x09U
 #define USB_AUDIO_DESC_SIZ                            0x09U
 #define AUDIO_STANDARD_ENDPOINT_DESC_SIZE             0x09U
@@ -91,11 +91,19 @@
 
 #define AUDIO_ENDPOINT_GENERAL                        0x01U
 
+/* Audio Requests */
 #define AUDIO_REQ_GET_CUR                             0x81U
 #define AUDIO_REQ_SET_CUR                             0x01U
 
 #define AUDIO_OUT_STREAMING_CTRL                      0x02U
 
+/* Audio Control Requests */
+#define AUDIO_CONTROL_REQ                             0x01U
+
+/* Audio Streaming Requests */
+#define AUDIO_STREAMING_REQ                           0x02U
+#define AUDIO_STREAMING_REQ_FREQ_CTRL                 0x01U
+#define AUDIO_STREAMING_REQ_PITCH_CTRL                0x02U
 
 #define AUDIO_OUT_PACKET                              (uint16_t)(((USBD_AUDIO_FREQ * 2U * 2U) / 1000U) + 4)
 
@@ -143,10 +151,12 @@ AUDIO_OffsetTypeDef;
   */
  typedef struct
 {
-   uint8_t cmd;
-   uint8_t data[USB_MAX_EP0_SIZE];
-   uint8_t len;
-   uint8_t unit;
+   uint8_t cmd;                    /* bRequest */
+   uint8_t req_type;               /* bmRequest */
+   uint8_t cs;                     /* wValue: Control Selector or Control Number */
+   uint8_t unit;                   /* wIndex: Feature Unit ID, Extension Unit ID, or Interface, Endpoint */
+   uint8_t len;                    /* wLength */
+   uint8_t data[USB_MAX_EP0_SIZE]; /* Data */
 }
 USBD_AUDIO_ControlTypeDef;
 
@@ -157,9 +167,10 @@ typedef struct
   uint32_t                  alt_setting;
   uint8_t                   buffer[AUDIO_TOTAL_BUF_SIZE];
   AUDIO_OffsetTypeDef       offset;
-  uint8_t                    rd_enable;
-  uint16_t                   rd_ptr;
-  uint16_t                   wr_ptr;
+  uint8_t                   rd_enable;
+  uint16_t                  rd_ptr;
+  uint16_t                  wr_ptr;
+  uint32_t                  freq;
   USBD_AUDIO_ControlTypeDef control;
 }
 USBD_AUDIO_HandleTypeDef;

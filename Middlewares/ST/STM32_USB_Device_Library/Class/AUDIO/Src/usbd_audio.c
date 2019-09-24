@@ -99,6 +99,11 @@
 #define AUDIO_PACKET_SZE(frq) (uint8_t)(((frq / 1000U + 1) * 2U * 2U) & 0xFFU), \
                               (uint8_t)((((frq / 1000U + 1) * 2U * 2U) >> 8) & 0xFFU)
 
+#define AUDIO_FB_44K (44 << 22) + (1 << 22) / 10
+#define AUDIO_FB_48K 48 << 22
+#define AUDIO_FB_96K 96 << 22
+#define AUDIO_FB_DEFAULT AUDIO_FB_96K
+
 /**
   * @}
   */
@@ -168,7 +173,7 @@ __ALIGN_BEGIN static uint8_t USBD_AUDIO_CfgDesc[USB_AUDIO_CONFIG_DESC_SIZ] __ALI
     /* Configuration 1 */
     0x09,                              /* bLength */
     USB_DESC_TYPE_CONFIGURATION,       /* bDescriptorType */
-    LOBYTE(USB_AUDIO_CONFIG_DESC_SIZ), /* wTotalLength  118 bytes*/
+    LOBYTE(USB_AUDIO_CONFIG_DESC_SIZ), /* wTotalLength 121 bytes*/
     HIBYTE(USB_AUDIO_CONFIG_DESC_SIZ),
     0x02, /* bNumInterfaces */
     0x01, /* bConfigurationValue */
@@ -277,16 +282,18 @@ __ALIGN_BEGIN static uint8_t USBD_AUDIO_CfgDesc[USB_AUDIO_CONFIG_DESC_SIZ] __ALI
     /* 07 byte*/
 
     /* USB Speaker Audio Type I Format Interface Descriptor */
-    0x0B,                               /* bLength */
+    0x11,                               /* bLength */
     AUDIO_INTERFACE_DESCRIPTOR_TYPE,    /* bDescriptorType */
     AUDIO_STREAMING_FORMAT_TYPE,        /* bDescriptorSubtype */
     AUDIO_FORMAT_TYPE_I,                /* bFormatType */
     0x02,                               /* bNrChannels */
     0x02,                               /* bSubFrameSize :  2 Bytes per frame (16bits) */
     0x10,                               /* bBitResolution (16-bits per sample) */
-    0x01,                               /* bSamFreqType only one frequency supported */
-    AUDIO_SAMPLE_FREQ(USBD_AUDIO_FREQ), /* Audio sampling frequency coded on 3 bytes */
-    /* 11 byte*/
+    0x03,                               /* bSamFreqType two frequencies supported */
+    AUDIO_SAMPLE_FREQ(44100),           /* Audio sampling frequency coded on 3 bytes */
+    AUDIO_SAMPLE_FREQ(48000),           /* Audio sampling frequency coded on 3 bytes */
+    AUDIO_SAMPLE_FREQ(96000),           /* Audio sampling frequency coded on 3 bytes */
+    /* 17 byte*/
 
     /* Endpoint 1 - Standard Descriptor */
     AUDIO_STANDARD_ENDPOINT_DESC_SIZE, /* bLength */
@@ -303,7 +310,7 @@ __ALIGN_BEGIN static uint8_t USBD_AUDIO_CfgDesc[USB_AUDIO_CONFIG_DESC_SIZ] __ALI
     AUDIO_STREAMING_ENDPOINT_DESC_SIZE, /* bLength */
     AUDIO_ENDPOINT_DESCRIPTOR_TYPE,     /* bDescriptorType */
     AUDIO_ENDPOINT_GENERAL,             /* bDescriptor */
-    0x00,                               /* bmAttributes - Sampling Frequency control is supported (not implemented). See UAC Spec 1.0 p.62 */
+    0x01,                               /* bmAttributes - Sampling Frequency control is supported. See UAC Spec 1.0 p.62 */
     0x00,                               /* bLockDelayUnits */
     0x00,                               /* wLockDelay */
     0x00,
@@ -340,6 +347,13 @@ __ALIGN_BEGIN static uint8_t USBD_AUDIO_DeviceQualifierDesc[USB_LEN_DEV_QUALIFIE
 
 volatile uint32_t tx_flag = 0;
 volatile uint32_t is_playing = 0;
+
+volatile uint32_t fb_nom = AUDIO_FB_DEFAULT;
+volatile uint32_t fb_delta = 1 << 22;
+
+volatile uint32_t fb_value = AUDIO_FB_DEFAULT;
+volatile uint32_t audio_buf_writable_size_last = AUDIO_TOTAL_BUF_SIZE / 2U;
+volatile int32_t fb_raw = AUDIO_FB_DEFAULT;
 /* FNSOF is kept for future use */
 //volatile uint32_t fnsof = 0;
 
@@ -385,6 +399,7 @@ static uint8_t USBD_AUDIO_Init(USBD_HandleTypeDef* pdev, uint8_t cfgidx)
     haudio->wr_ptr = 0U;
     haudio->rd_ptr = 0U;
     haudio->rd_enable = 0U;
+    haudio->freq = USBD_AUDIO_FREQ;
 
     /* Initialize the Audio output Hardware layer */
     if (((USBD_AUDIO_ItfTypeDef*)pdev->pUserData)->Init(USBD_AUDIO_FREQ, AUDIO_DEFAULT_VOLUME, 0U) != 0) {
@@ -590,10 +605,47 @@ static uint8_t USBD_AUDIO_EP0_RxReady(USBD_HandleTypeDef* pdev)
 
   if (haudio->control.cmd == AUDIO_REQ_SET_CUR) { /* In this driver, to simplify code, only SET_CUR request is managed */
 
-    if (haudio->control.unit == AUDIO_OUT_STREAMING_CTRL) {
-      ((USBD_AUDIO_ItfTypeDef*)pdev->pUserData)->MuteCtl(haudio->control.data[0]);
-      haudio->control.cmd = 0U;
-      haudio->control.len = 0U;
+    if (haudio->control.req_type == AUDIO_CONTROL_REQ) {
+      /* Mute Control */
+      if (haudio->control.unit == AUDIO_OUT_STREAMING_CTRL) {
+        ((USBD_AUDIO_ItfTypeDef*)pdev->pUserData)->MuteCtl(haudio->control.data[0]);
+
+        haudio->control.cmd = 0U;
+        haudio->control.len = 0U;
+      }
+    } else if (haudio->control.req_type == AUDIO_STREAMING_REQ) {
+      /* Frequency Control */
+      if (haudio->control.cs == AUDIO_STREAMING_REQ_FREQ_CTRL) {
+        ((USBD_AUDIO_ItfTypeDef*)pdev->pUserData)->DeInit(0);
+
+        uint32_t new_freq = *(uint32_t*)&haudio->control.data & 0x00ffffff;
+
+        switch (new_freq) {
+          case 44100:
+            fb_raw = fb_nom = fb_value = (44 << 22) + (1 << 22) / 10;
+            break;
+          case 48000:
+            fb_raw = fb_nom = fb_value = 48 << 22;
+            break;
+          case 96000:
+            fb_raw = fb_nom = fb_value = 96 << 22;
+          default:
+            fb_raw = fb_nom = fb_value = 96 << 22;
+        }
+
+        is_playing = 0U;
+
+        haudio->offset = AUDIO_OFFSET_UNKNOWN;
+        haudio->rd_enable = 0U;
+        haudio->rd_ptr = 0U;
+        haudio->wr_ptr = 0U;
+        haudio->freq = new_freq;
+
+        haudio->control.cmd = 0U;
+        haudio->control.len = 0U;
+
+        ((USBD_AUDIO_ItfTypeDef*)pdev->pUserData)->Init(new_freq, AUDIO_DEFAULT_VOLUME, 0);
+      }
     }
   }
 
@@ -637,9 +689,9 @@ static uint8_t USBD_AUDIO_SOF(USBD_HandleTypeDef* pdev)
    *    again called.
    * 2. Must be volatile so that it will not be optimized out by the compiler.
    */
-  static volatile uint32_t fb_value = 0x30000000 >> 2;
-  static volatile uint32_t audio_buf_writable_size_last = AUDIO_TOTAL_BUF_SIZE / 2U;
-  static volatile int32_t fb_raw = 0x30000000 >> 2;
+  // static volatile uint32_t fb_value = AUDIO_FB_DEFAULT;
+  // static volatile uint32_t audio_buf_writable_size_last = AUDIO_TOTAL_BUF_SIZE / 2U;
+  // static volatile int32_t fb_raw = AUDIO_FB_DEFAULT;
 
   /* Do stuff only when playing */
   if (haudio->rd_enable == 1U) {
@@ -666,11 +718,18 @@ static uint8_t USBD_AUDIO_SOF(USBD_HandleTypeDef* pdev)
     /* Calculate feedback value based on the change of writable buffer size */
     int32_t audio_buf_writable_size_change;
     audio_buf_writable_size_change = audio_buf_writable_size - audio_buf_writable_size_last;
-    fb_raw += audio_buf_writable_size_change * 10000;
+    fb_raw += audio_buf_writable_size_change * 0x1000;
     fb_value = (uint32_t)fb_raw;
 
     /* Update last writable buffer size */
     audio_buf_writable_size_last = audio_buf_writable_size;
+
+    /* Check feedback max / min */
+    if (fb_value > fb_nom + fb_delta) {
+      fb_value = fb_raw = fb_nom + fb_delta;
+    } else if (fb_value < fb_nom - fb_delta) {
+      fb_value = fb_raw = fb_nom - fb_delta;
+    }
 
     /* Transmit feedback only when the last one is transmitted */
     if (tx_flag == 0U) {
@@ -887,10 +946,17 @@ static void AUDIO_REQ_GetCurrent(USBD_HandleTypeDef* pdev, USBD_SetupReqTypedef*
   USBD_AUDIO_HandleTypeDef* haudio;
   haudio = (USBD_AUDIO_HandleTypeDef*)pdev->pClassData;
 
-  memset(haudio->control.data, 0, 64U);
-
-  /* Send the current mute state */
-  USBD_CtlSendData(pdev, haudio->control.data, req->wLength);
+  if ((req->bmRequest & 0x1f) == AUDIO_CONTROL_REQ) {
+    /* Send the current mute state */
+    uint8_t mute = 0;
+    USBD_CtlSendData(pdev, &mute, 1);
+  } else if ((req->bmRequest & 0x1f) == AUDIO_STREAMING_REQ) {
+    if (HIBYTE(req->wValue) == AUDIO_STREAMING_REQ_FREQ_CTRL) {
+      /* Send current frequency */
+      uint32_t freq __attribute__((aligned(4))) = haudio->freq;
+      USBD_CtlSendData(pdev, (uint8_t*)&freq, 3);
+    }
+  }
 }
 
 /**
@@ -911,9 +977,11 @@ static void AUDIO_REQ_SetCurrent(USBD_HandleTypeDef* pdev, USBD_SetupReqTypedef*
                       haudio->control.data,
                       req->wLength);
 
-    haudio->control.cmd = AUDIO_REQ_SET_CUR;     /* Set the request value */
-    haudio->control.len = (uint8_t)req->wLength; /* Set the request data length */
-    haudio->control.unit = HIBYTE(req->wIndex);  /* Set the request target unit */
+    haudio->control.cmd = AUDIO_REQ_SET_CUR;          /* Set the request value */
+    haudio->control.req_type = req->bmRequest & 0x1f; /* Set the request type. See UAC Spec 1.0 - 5.2.1 Request Layout */
+    haudio->control.len = (uint8_t)req->wLength;      /* Set the request data length */
+    haudio->control.unit = HIBYTE(req->wIndex);       /* Set the request target unit */
+    haudio->control.cs = HIBYTE(req->wValue);         /* Set the request control selector */
   }
 }
 
