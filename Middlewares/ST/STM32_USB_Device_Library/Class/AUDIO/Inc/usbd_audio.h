@@ -90,6 +90,7 @@
 #define AUDIO_STREAMING_INTERFACE_DESC_SIZE           0x07U
 
 #define AUDIO_CONTROL_MUTE                            0x0001U
+#define AUDIO_CONTROL_VOL                             0x0002U
 
 #define AUDIO_FORMAT_TYPE_I                           0x01U
 #define AUDIO_FORMAT_TYPE_III                         0x03U
@@ -98,12 +99,21 @@
 
 /* Audio Requests */
 #define AUDIO_REQ_GET_CUR                             0x81U
+#define AUDIO_REQ_GET_MIN                             0x82U
+#define AUDIO_REQ_GET_MAX                             0x83U
+#define AUDIO_REQ_GET_RES                             0x84U
 #define AUDIO_REQ_SET_CUR                             0x01U
+#define AUDIO_REQ_SET_MIN                             0x02U
+#define AUDIO_REQ_SET_MAX                             0x03U
+#define AUDIO_REQ_SET_RES                             0x04U
 
 #define AUDIO_OUT_STREAMING_CTRL                      0x02U
 
 /* Audio Control Requests */
 #define AUDIO_CONTROL_REQ                             0x01U
+/* Feature Unit, UAC Spec 1.0 p.102 */
+#define AUDIO_CONTROL_REQ_FU_MUTE                     0x01U
+#define AUDIO_CONTROL_REQ_FU_VOL                      0x02U
 
 /* Audio Streaming Requests */
 #define AUDIO_STREAMING_REQ                           0x02U
@@ -158,7 +168,8 @@ AUDIO_OffsetTypeDef;
 {
    uint8_t cmd;                    /* bRequest */
    uint8_t req_type;               /* bmRequest */
-   uint8_t cscn;                   /* wValue: Control Selector (high byte) and Control Number (low byte) */
+   uint8_t cs;                     /* wValue (high byte): Control Selector */
+   uint8_t cn;                     /* wValue (low byte): Control Number */
    uint8_t unit;                   /* wIndex: Feature Unit ID, Extension Unit ID, or Interface, Endpoint */
    uint8_t len;                    /* wLength */
    uint8_t data[USB_MAX_EP0_SIZE]; /* Data */
