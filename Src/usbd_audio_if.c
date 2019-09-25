@@ -59,7 +59,7 @@ static int8_t Audio_PeriodicTC(uint8_t cmd);
 static int8_t Audio_GetState(void);
 
 /* Private variables ---------------------------------------------------------*/
-extern uint32_t playing;
+extern AUDIO_STATUS_TypeDef audio_status;
 extern USBD_HandleTypeDef USBD_Device;
 USBD_AUDIO_ItfTypeDef USBD_AUDIO_fops = {
     Audio_Init,
@@ -83,6 +83,7 @@ USBD_AUDIO_ItfTypeDef USBD_AUDIO_fops = {
  */
 static int8_t Audio_Init(uint32_t AudioFreq, uint32_t Volume, uint32_t options)
 {
+  audio_status.frequency = AudioFreq;
   BSP_AUDIO_OUT_Init(OUTPUT_DEVICE_AUTO, Volume, AudioFreq);
 
   /* Update the Audio frame slot configuration to match the PCM standard
@@ -100,6 +101,7 @@ static int8_t Audio_Init(uint32_t AudioFreq, uint32_t Volume, uint32_t options)
  */
 static int8_t Audio_DeInit(uint32_t options)
 {
+  audio_status.playing = 0U;
   BSP_AUDIO_OUT_Stop(CODEC_PDWN_SW);
   return 0;
 }
@@ -117,12 +119,12 @@ static int8_t Audio_PlaybackCmd(uint8_t* pbuf, uint32_t size, uint8_t cmd)
   switch (cmd) {
     case AUDIO_CMD_START:
       BSP_AUDIO_OUT_Play((uint16_t*)pbuf, 2 * size);
-      playing = 1U;
+      audio_status.playing = 1U;
       break;
 
     case AUDIO_CMD_PLAY:
       BSP_AUDIO_OUT_ChangeBuffer((uint16_t*)pbuf, 2 * size);
-      playing = 1U;
+      audio_status.playing = 1U;
       break;
   }
   return 0;

@@ -50,7 +50,7 @@
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
 USBD_HandleTypeDef USBD_Device;
-uint32_t playing = 0;
+AUDIO_STATUS_TypeDef audio_status;
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
@@ -90,10 +90,28 @@ int main(void)
 
   /* play_start is set to 1 when AUDIO_CMD_START */
   while (1) {
-    if (playing) {
+    if (audio_status.playing) {
       BSP_LED_On(LED1);
     } else {
       BSP_LED_Off(LED1);
+    }
+
+    switch (audio_status.frequency) {
+      case 44100:
+        BSP_LED_On(LED3);
+        BSP_LED_Off(LED4);
+        break;
+      case 48000:
+        BSP_LED_On(LED4);
+        BSP_LED_Off(LED3);
+        break;
+      case 96000:
+        BSP_LED_On(LED4);
+        BSP_LED_On(LED3);
+        break;
+      default:
+        BSP_LED_Off(LED3);
+        BSP_LED_Off(LED4);
     }
   }
 }
@@ -209,7 +227,7 @@ void SystemClock_Config(void)
 
 //   //clock TIM2 via ETR pin
 //   TIM_ETR_SetConfig(TIM2, TIM_ETRPRESCALER_DIV1, TIM_ETRPOLARITY_NONINVERTED, 0);
-  
+
 //   /* Enable capture*/
 //   TIM_ICInitStructure.ICPolarity = TIM_ICPOLARITY_RISING;
 //   TIM_ICInitStructure.ICSelection = TIM_ICSELECTION_TRC;
@@ -220,7 +238,7 @@ void SystemClock_Config(void)
 //   TIM_ICInit(TIM2, &TIM_ICInitStructure);
 
 //   HAL_TIMEx_RemapConfig(TIM2, TIM_TIM2_USBFS_SOF);
-  
+
 //   /* TIM2 input trigger selection */
 //   TIM_SelectInputTrigger(TIM2, TIM_TS_ITR1);
 //   TIM_SelectSlaveMode(TIM2, TIM_SLAVEMODE_RESET);
