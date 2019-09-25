@@ -41,14 +41,19 @@
 /** @defgroup USBD_AUDIO_Exported_Defines
   * @{
   */
-#ifndef USBD_AUDIO_FREQ
+
 /* AUDIO Class Config */
-#define USBD_AUDIO_FREQ                               48000U
-#endif /* USBD_AUDIO_FREQ */
+#ifndef USBD_AUDIO_FREQ_DEFAULT
+#define USBD_AUDIO_FREQ_DEFAULT                       48000U
+#endif
+
+#ifndef USBD_AUDIO_FREQ_MAX
+#define USBD_AUDIO_FREQ_MAX                           96000U
+#endif
 
 #ifndef USBD_MAX_NUM_INTERFACES
 #define USBD_MAX_NUM_INTERFACES                       1U
-#endif /* USBD_AUDIO_FREQ */
+#endif
 
 /* bEndpointAddress, see UAC 1.0 spec, p.61 */
 #define AUDIO_OUT_EP                                  0x01U
@@ -105,7 +110,7 @@
 #define AUDIO_STREAMING_REQ_FREQ_CTRL                 0x01U
 #define AUDIO_STREAMING_REQ_PITCH_CTRL                0x02U
 
-#define AUDIO_OUT_PACKET                              (uint16_t)(((USBD_AUDIO_FREQ * 2U * 2U) / 1000U) + 4)
+#define AUDIO_OUT_PACKET                              (uint16_t)(((USBD_AUDIO_FREQ_MAX * 2U * 2U) / 1000U) + 4)
 
 /* Input endpoint is for feedback. See USB 1.1 Spec, 5.10.4.2 Feedback. */
 #define AUDIO_IN_PACKET                               3U
@@ -153,7 +158,7 @@ AUDIO_OffsetTypeDef;
 {
    uint8_t cmd;                    /* bRequest */
    uint8_t req_type;               /* bmRequest */
-   uint8_t cs;                     /* wValue: Control Selector or Control Number */
+   uint8_t cscn;                   /* wValue: Control Selector (high byte) and Control Number (low byte) */
    uint8_t unit;                   /* wIndex: Feature Unit ID, Extension Unit ID, or Interface, Endpoint */
    uint8_t len;                    /* wLength */
    uint8_t data[USB_MAX_EP0_SIZE]; /* Data */
