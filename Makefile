@@ -210,7 +210,7 @@ clean:
 # Flash binary
 #######################################
 flash:
-	-st-flash write $(BUILD_DIR)/$(TARGET).bin 0x08000000
+	-st-flash --reset write $(BUILD_DIR)/$(TARGET).bin 0x08000000
 
 #######################################
 # dependencies
