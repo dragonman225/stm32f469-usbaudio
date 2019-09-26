@@ -99,6 +99,9 @@
 #define AUDIO_PACKET_SZE(frq) (uint8_t)(((frq / 1000U + 1) * 2U * 2U) & 0xFFU), \
                               (uint8_t)((((frq / 1000U + 1) * 2U * 2U) >> 8) & 0xFFU)
 
+/* Convert USB volume value to % */
+#define VOL_TO_PERCENT(vol) (uint8_t)(((33024 + vol) * 100) / 33024)
+
 #define AUDIO_CONTROL_FEATURES AUDIO_CONTROL_MUTE | AUDIO_CONTROL_VOL
 
 #define AUDIO_FB_44K (44 << 22) + (1 << 22) / 10
@@ -413,6 +416,8 @@ static uint8_t USBD_AUDIO_Init(USBD_HandleTypeDef* pdev, uint8_t cfgidx)
     haudio->rd_ptr = 0U;
     haudio->rd_enable = 0U;
     haudio->freq = USBD_AUDIO_FREQ_DEFAULT;
+    haudio->bit_depth = 16U;
+    haudio->vol = AUDIO_DEFAULT_VOLUME;
 
     /* Initialize the Audio output Hardware layer */
     if (((USBD_AUDIO_ItfTypeDef*)pdev->pUserData)->Init(USBD_AUDIO_FREQ_DEFAULT, AUDIO_DEFAULT_VOLUME, 0U) != 0) {
@@ -852,8 +857,7 @@ static void AUDIO_REQ_GetCurrent(USBD_HandleTypeDef* pdev, USBD_SetupReqTypedef*
           break;
       case AUDIO_CONTROL_REQ_FU_VOL: {
         /* Current volume. See UAC Spec 1.0 p.77 */
-        uint16_t vol = 0xfa00;
-        USBD_CtlSendData(pdev, (uint8_t*)&vol, 2);
+        USBD_CtlSendData(pdev, (uint8_t*)&haudio->vol, 2);
       };
           break;
     }
@@ -983,7 +987,8 @@ static uint8_t USBD_AUDIO_EP0_RxReady(USBD_HandleTypeDef* pdev)
         /* Volume Control */
         case AUDIO_CONTROL_REQ_FU_VOL: {
           int16_t vol = *(int16_t*)&haudio->control.data[0];
-          ((USBD_AUDIO_ItfTypeDef*)pdev->pUserData)->VolumeCtl((((33024 + vol) * 100) / 33024));
+          haudio->vol = vol;
+          ((USBD_AUDIO_ItfTypeDef*)pdev->pUserData)->VolumeCtl(VOL_TO_PERCENT(vol));
         };
             break;
       }
@@ -1071,7 +1076,7 @@ static void AUDIO_OUT_Restart(USBD_HandleTypeDef* pdev)
       fb_raw = fb_nom = fb_value = 96 << 22;
   }
 
-  ((USBD_AUDIO_ItfTypeDef*)pdev->pUserData)->Init(haudio->freq, AUDIO_DEFAULT_VOLUME, 0);
+  ((USBD_AUDIO_ItfTypeDef*)pdev->pUserData)->Init(haudio->freq, VOL_TO_PERCENT(haudio->vol), 0);
 
   tx_flag = 0U;
   all_ready = 1U;
