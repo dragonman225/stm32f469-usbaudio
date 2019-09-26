@@ -545,6 +545,10 @@ static uint8_t USBD_AUDIO_Setup(USBD_HandleTypeDef* pdev,
                 if (haudio->alt_setting == 0U) {
                   AUDIO_OUT_StopAndReset(pdev);
                 } else if (haudio->alt_setting == 1U) {
+                  haudio->bit_depth = 16U;
+                  AUDIO_OUT_Restart(pdev);
+                } else if (haudio->alt_setting == 2U) {
+                  haudio->bit_depth = 24U;
                   AUDIO_OUT_Restart(pdev);
                 }
               }
@@ -848,7 +852,7 @@ static void AUDIO_REQ_GetCurrent(USBD_HandleTypeDef* pdev, USBD_SetupReqTypedef*
           break;
       case AUDIO_CONTROL_REQ_FU_VOL: {
         /* Current volume. See UAC Spec 1.0 p.77 */
-        uint16_t vol = 0xda00;
+        uint16_t vol = 0xfa00;
         USBD_CtlSendData(pdev, (uint8_t*)&vol, 2);
       };
           break;

@@ -125,7 +125,7 @@
 /* Input endpoint is for feedback. See USB 1.1 Spec, 5.10.4.2 Feedback. */
 #define AUDIO_IN_PACKET                               3U
 
-#define AUDIO_DEFAULT_VOLUME                          70U
+#define AUDIO_DEFAULT_VOLUME                          40U // 6%
 
 /* Number of sub-packets in the audio transfer buffer. You can modify this value but always make sure
   that it is an even number and higher than 3 */
@@ -187,6 +187,7 @@ typedef struct
   uint16_t                  rd_ptr;
   uint16_t                  wr_ptr;
   uint32_t                  freq;
+  uint32_t                  bit_depth;
   USBD_AUDIO_ControlTypeDef control;
 }
 USBD_AUDIO_HandleTypeDef;
