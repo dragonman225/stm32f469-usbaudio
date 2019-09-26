@@ -841,21 +841,21 @@ static void AUDIO_REQ_GetCurrent(USBD_HandleTypeDef* pdev, USBD_SetupReqTypedef*
   if ((req->bmRequest & 0x1f) == AUDIO_CONTROL_REQ) {
     switch (HIBYTE(req->wValue)) {
       case AUDIO_CONTROL_REQ_FU_MUTE: {
-        /* Send the current mute state */
+        /* Current mute state */
         uint8_t mute = 0;
         USBD_CtlSendData(pdev, &mute, 1);
       };
           break;
       case AUDIO_CONTROL_REQ_FU_VOL: {
-        /* I set max at 0x0000 and min at 0x8001. Default at 0xf334 is about 12%. See UAC Spec 1.0 p.77 */
-        uint16_t vol = 0xf334;
+        /* Current volume. See UAC Spec 1.0 p.77 */
+        uint16_t vol = 0xda00;
         USBD_CtlSendData(pdev, (uint8_t*)&vol, 2);
       };
           break;
     }
   } else if ((req->bmRequest & 0x1f) == AUDIO_STREAMING_REQ) {
     if (HIBYTE(req->wValue) == AUDIO_STREAMING_REQ_FREQ_CTRL) {
-      /* Send current frequency */
+      /* Current frequency */
       uint32_t freq __attribute__((aligned(4))) = haudio->freq;
       USBD_CtlSendData(pdev, (uint8_t*)&freq, 3);
     }
@@ -874,7 +874,7 @@ static void AUDIO_REQ_GetMax(USBD_HandleTypeDef* pdev, USBD_SetupReqTypedef* req
   if ((req->bmRequest & 0x1f) == AUDIO_CONTROL_REQ) {
     switch (HIBYTE(req->wValue)) {
       case AUDIO_CONTROL_REQ_FU_VOL: {
-        /* Second form. See UAC Spec 1.0 p.77 */
+        /* Max volume. See UAC Spec 1.0 p.77 */
         uint16_t vol_max = 0x0000;
         USBD_CtlSendData(pdev, (uint8_t*)&vol_max, 2);
       };
@@ -895,8 +895,8 @@ static void AUDIO_REQ_GetMin(USBD_HandleTypeDef* pdev, USBD_SetupReqTypedef* req
   if ((req->bmRequest & 0x1f) == AUDIO_CONTROL_REQ) {
     switch (HIBYTE(req->wValue)) {
       case AUDIO_CONTROL_REQ_FU_VOL: {
-        /* Second form. See UAC Spec 1.0 p.77 */
-        uint16_t vol_min = 0x8001;
+        /* Min volume. See UAC Spec 1.0 p.77 */
+        uint16_t vol_min = 0x8100;
         USBD_CtlSendData(pdev, (uint8_t*)&vol_min, 2);
       };
           break;
@@ -916,7 +916,11 @@ static void AUDIO_REQ_GetRes(USBD_HandleTypeDef* pdev, USBD_SetupReqTypedef* req
   if ((req->bmRequest & 0x1f) == AUDIO_CONTROL_REQ) {
     switch (HIBYTE(req->wValue)) {
       case AUDIO_CONTROL_REQ_FU_VOL: {
-        /* Second form. See UAC Spec 1.0 p.77 */
+        /**
+         * Volume step. Be careful that total number of steps can't be too many, 
+         * host will complain.
+         * See UAC Spec 1.0 p.77
+         */
         uint16_t vol_res = 0x0100;
         USBD_CtlSendData(pdev, (uint8_t*)&vol_res, 2);
       };
@@ -966,15 +970,16 @@ static uint8_t USBD_AUDIO_EP0_RxReady(USBD_HandleTypeDef* pdev)
   if (haudio->control.cmd == AUDIO_REQ_SET_CUR) { /* In this driver, to simplify code, only SET_CUR request is managed */
 
     if (haudio->control.req_type == AUDIO_CONTROL_REQ) {
-      /* Mute Control */
       switch (haudio->control.cs) {
+        /* Mute Control */
         case AUDIO_CONTROL_REQ_FU_MUTE: {
           ((USBD_AUDIO_ItfTypeDef*)pdev->pUserData)->MuteCtl(haudio->control.data[0]);
         };
             break;
+        /* Volume Control */
         case AUDIO_CONTROL_REQ_FU_VOL: {
           int16_t vol = *(int16_t*)&haudio->control.data[0];
-          ((USBD_AUDIO_ItfTypeDef*)pdev->pUserData)->VolumeCtl((((32768 + vol) * 100) >> 15));
+          ((USBD_AUDIO_ItfTypeDef*)pdev->pUserData)->VolumeCtl((((33024 + vol) * 100) / 33024));
         };
             break;
       }
