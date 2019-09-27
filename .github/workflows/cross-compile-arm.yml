@@ -1,0 +1,19 @@
+name: ARM Cross-compilation CI
+
+on:
+  push:
+    branches:
+    - master
+    - usbaudio-async-01
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v1
+    - name: Install toolchain
+      run: apt-get -y install arm-none-eabi-gcc
+    - name: Build binary
+      run: make
