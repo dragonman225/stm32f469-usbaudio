@@ -363,6 +363,7 @@ volatile uint32_t fb_nom = AUDIO_FB_DEFAULT;
 volatile uint32_t fb_value = AUDIO_FB_DEFAULT;
 volatile uint32_t audio_buf_writable_size_last = AUDIO_TOTAL_BUF_SIZE / 2U;
 volatile int32_t fb_raw = AUDIO_FB_DEFAULT;
+volatile uint8_t fb_data[3] = {(AUDIO_FB_DEFAULT & 0x0000FF00) >> 8, (AUDIO_FB_DEFAULT & 0x00FF0000) >> 16, (AUDIO_FB_DEFAULT & 0xFF000000) >> 24};
 
 /* FNSOF is critical for frequency changing to work */
 volatile uint32_t fnsof = 0;
@@ -689,6 +690,11 @@ static uint8_t USBD_AUDIO_SOF(USBD_HandleTypeDef* pdev)
       } else if (fb_value < fb_nom - AUDIO_FB_DELTA) {
         fb_value = fb_raw = fb_nom - AUDIO_FB_DELTA;
       }
+
+      /* Set 10.14 format feedback data */
+      fb_data[0] = (fb_value & 0x0000FF00) >> 8;
+      fb_data[1] = (fb_value & 0x00FF0000) >> 16;
+      fb_data[2] = (fb_value & 0xFF000000) >> 24;
     }
 
     /* Transmit feedback only when the last one is transmitted */
@@ -698,10 +704,8 @@ static uint8_t USBD_AUDIO_SOF(USBD_HandleTypeDef* pdev)
       uint32_t USBx_BASE = (uint32_t)USBx;
       uint32_t volatile fnsof_new = (USBx_DEVICE->DSTS & USB_OTG_DSTS_FNSOF) >> 8;
 
-      uint8_t fb_data[3] = {(fb_value & 0x0000FF00) >> 8, (fb_value & 0x00FF0000) >> 16, (fb_value & 0xFF000000) >> 24};
-
       if ((fnsof & 0x1) == (fnsof_new & 0x1)) {
-        USBD_LL_Transmit(pdev, AUDIO_IN_EP, fb_data, 3U);
+        USBD_LL_Transmit(pdev, AUDIO_IN_EP, (uint8_t *)fb_data, 3U);
         /* Block transmission until it's finished. */
         tx_flag = 1U;
       }
