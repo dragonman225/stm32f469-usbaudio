@@ -1,5 +1,7 @@
 # STM32F469I-DISCO USB Audio Example
 
+[![Actions Status](https://github.com/dragonman225/stm32f469-usbaudio/workflows/ARM Cross-compilation CI/badge.svg)](https://github.com/dragonman225/stm32f469-usbaudio/actions)
+
 This is a port of [STM32469I-Discovery "AUDIO_Standalone" Example](https://github.com/STMicroelectronics/STM32CubeF4/tree/master/Projects/STM32469I-Discovery/Applications/USB_Device/AUDIO_Standalone) to Makefile project.
 
 The original source only provides project config for EWARM, MDK-ARM, and SW4STM32, I ported it to Makefile so that I don't need specific IDEs to compile the code.
