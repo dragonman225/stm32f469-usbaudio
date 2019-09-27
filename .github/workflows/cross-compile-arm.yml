@@ -14,6 +14,6 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: Install toolchain
-      run: sudo apt-get -y install arm-none-eabi-gcc
+      run: sudo apt-get -y install gcc-arm-none-eabi
     - name: Build binary
       run: make
