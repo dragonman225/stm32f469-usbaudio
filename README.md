@@ -1,6 +1,6 @@
 # STM32F469I-DISCO USB Audio Example
 
-[![Actions Status](https://github.com/dragonman225/stm32f469-usbaudio/workflows/ARM Cross-compilation CI/badge.svg)](https://github.com/dragonman225/stm32f469-usbaudio/actions)
+![Actions Status](https://github.com/dragonman225/stm32f469-usbaudio/workflows/ARM%20Cross-compilation%20CI/badge.svg)
 
 This is a port of [STM32469I-Discovery "AUDIO_Standalone" Example](https://github.com/STMicroelectronics/STM32CubeF4/tree/master/Projects/STM32469I-Discovery/Applications/USB_Device/AUDIO_Standalone) to Makefile project.
 
