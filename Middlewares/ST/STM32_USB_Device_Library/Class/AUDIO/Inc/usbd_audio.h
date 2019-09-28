@@ -42,7 +42,13 @@
   * @{
   */
 
-/* AUDIO Class Config */
+/**
+ * 
+ * AUDIO Class Config
+ * 
+ */
+
+/* Frequency */
 #ifndef USBD_AUDIO_FREQ_DEFAULT
 #define USBD_AUDIO_FREQ_DEFAULT                       48000U
 #endif
@@ -51,6 +57,24 @@
 #define USBD_AUDIO_FREQ_MAX                           96000U
 #endif
 
+/* Volume. See UAC Spec 1.0 p.77 */
+#ifndef USBD_AUDIO_VOL_DEFAULT
+#define USBD_AUDIO_VOL_DEFAULT                        0x8d00U
+#endif
+
+#ifndef USBD_AUDIO_VOL_MAX
+#define USBD_AUDIO_VOL_MAX                            0x0000U
+#endif
+
+#ifndef USBD_AUDIO_VOL_MIN
+#define USBD_AUDIO_VOL_MIN                            0x8100U
+#endif
+
+#ifndef USBD_AUDIO_VOL_STEP
+#define USBD_AUDIO_VOL_STEP                           0x0100U
+#endif /* Total number of steps can't be too many, host will complain. */
+
+/* Interface */
 #ifndef USBD_MAX_NUM_INTERFACES
 #define USBD_MAX_NUM_INTERFACES                       1U
 #endif
@@ -124,8 +148,6 @@
 
 /* Input endpoint is for feedback. See USB 1.1 Spec, 5.10.4.2 Feedback. */
 #define AUDIO_IN_PACKET                               3U
-
-#define AUDIO_DEFAULT_VOLUME                          0xfa00U // 6%
 
 /* Number of sub-packets in the audio transfer buffer. You can modify this value but always make sure
   that it is an even number and higher than 3 */

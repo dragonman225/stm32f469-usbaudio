@@ -90,6 +90,8 @@
 /** @defgroup USBD_AUDIO_Private_Macros
   * @{
   */
+
+// clang-format off
 #define AUDIO_SAMPLE_FREQ(frq) (uint8_t)(frq), (uint8_t)((frq >> 8)), (uint8_t)((frq >> 16))
 
 /*
@@ -99,16 +101,19 @@
 #define AUDIO_PACKET_SZE(frq) (uint8_t)(((frq / 1000U + 1) * 2U * 2U) & 0xFFU), \
                               (uint8_t)((((frq / 1000U + 1) * 2U * 2U) >> 8) & 0xFFU)
 
-/* Convert USB volume value to % */
-#define VOL_TO_PERCENT(vol) (uint8_t)(((33024 + vol) * 100) / 33024)
-
+/* Feature Unit Config */
 #define AUDIO_CONTROL_FEATURES AUDIO_CONTROL_MUTE | AUDIO_CONTROL_VOL
 
-#define AUDIO_FB_44K (44 << 22) + (1 << 22) / 10
-#define AUDIO_FB_48K 48 << 22
-#define AUDIO_FB_96K 96 << 22
-#define AUDIO_FB_DEFAULT AUDIO_FB_96K
+/* Nomial feedback data for different frequencies */
+#define AUDIO_FB_DEFAULT \
+        (USBD_AUDIO_FREQ_DEFAULT == 96000) ? (96 << 22) \
+      : (USBD_AUDIO_FREQ_DEFAULT == 48000) ? (48 << 22) \
+      : (USBD_AUDIO_FREQ_DEFAULT == 44100) ? ((44 << 22) + (1 << 22) / 10) \
+      : (48 << 22)
+
+/* Feedback is limited to +/- 1kHz */
 #define AUDIO_FB_DELTA (uint32_t)(1 << 22)
+// clang-format on
 
 /**
   * @}
@@ -152,6 +157,8 @@ static void AUDIO_REQ_SetCurrent(USBD_HandleTypeDef* pdev, USBD_SetupReqTypedef*
 static void AUDIO_OUT_StopAndReset(USBD_HandleTypeDef* pdev);
 
 static void AUDIO_OUT_Restart(USBD_HandleTypeDef* pdev);
+
+static uint8_t VOL_PERCENT(int16_t vol);
 
 /**
   * @}
@@ -363,7 +370,10 @@ volatile uint32_t fb_nom = AUDIO_FB_DEFAULT;
 volatile uint32_t fb_value = AUDIO_FB_DEFAULT;
 volatile uint32_t audio_buf_writable_size_last = AUDIO_TOTAL_BUF_SIZE / 2U;
 volatile int32_t fb_raw = AUDIO_FB_DEFAULT;
-volatile uint8_t fb_data[3] = {(AUDIO_FB_DEFAULT & 0x0000FF00) >> 8, (AUDIO_FB_DEFAULT & 0x00FF0000) >> 16, (AUDIO_FB_DEFAULT & 0xFF000000) >> 24};
+volatile uint8_t fb_data[3] = {
+    (uint8_t)((AUDIO_FB_DEFAULT & 0x0000FF00) >> 8),
+    (uint8_t)((AUDIO_FB_DEFAULT & 0x00FF0000) >> 16),
+    (uint8_t)((AUDIO_FB_DEFAULT & 0xFF000000) >> 24)};
 
 /* FNSOF is critical for frequency changing to work */
 volatile uint32_t fnsof = 0;
@@ -418,10 +428,10 @@ static uint8_t USBD_AUDIO_Init(USBD_HandleTypeDef* pdev, uint8_t cfgidx)
     haudio->rd_enable = 0U;
     haudio->freq = USBD_AUDIO_FREQ_DEFAULT;
     haudio->bit_depth = 16U;
-    haudio->vol = AUDIO_DEFAULT_VOLUME;
+    haudio->vol = USBD_AUDIO_VOL_DEFAULT;
 
     /* Initialize the Audio output Hardware layer */
-    if (((USBD_AUDIO_ItfTypeDef*)pdev->pUserData)->Init(USBD_AUDIO_FREQ_DEFAULT, AUDIO_DEFAULT_VOLUME, 0U) != 0) {
+    if (((USBD_AUDIO_ItfTypeDef*)pdev->pUserData)->Init(haudio->freq, VOL_PERCENT(haudio->vol), 0U) != 0) {
       return USBD_FAIL;
     }
   }
@@ -705,7 +715,7 @@ static uint8_t USBD_AUDIO_SOF(USBD_HandleTypeDef* pdev)
       uint32_t volatile fnsof_new = (USBx_DEVICE->DSTS & USB_OTG_DSTS_FNSOF) >> 8;
 
       if ((fnsof & 0x1) == (fnsof_new & 0x1)) {
-        USBD_LL_Transmit(pdev, AUDIO_IN_EP, (uint8_t *)fb_data, 3U);
+        USBD_LL_Transmit(pdev, AUDIO_IN_EP, (uint8_t*)fb_data, 3U);
         /* Block transmission until it's finished. */
         tx_flag = 1U;
       }
@@ -886,8 +896,7 @@ static void AUDIO_REQ_GetMax(USBD_HandleTypeDef* pdev, USBD_SetupReqTypedef* req
   if ((req->bmRequest & 0x1f) == AUDIO_CONTROL_REQ) {
     switch (HIBYTE(req->wValue)) {
       case AUDIO_CONTROL_REQ_FU_VOL: {
-        /* Max volume. See UAC Spec 1.0 p.77 */
-        uint16_t vol_max = 0x0000;
+        int16_t vol_max = USBD_AUDIO_VOL_MAX;
         USBD_CtlSendData(pdev, (uint8_t*)&vol_max, 2);
       };
           break;
@@ -907,8 +916,7 @@ static void AUDIO_REQ_GetMin(USBD_HandleTypeDef* pdev, USBD_SetupReqTypedef* req
   if ((req->bmRequest & 0x1f) == AUDIO_CONTROL_REQ) {
     switch (HIBYTE(req->wValue)) {
       case AUDIO_CONTROL_REQ_FU_VOL: {
-        /* Min volume. See UAC Spec 1.0 p.77 */
-        uint16_t vol_min = 0x8100;
+        int16_t vol_min = USBD_AUDIO_VOL_MIN;
         USBD_CtlSendData(pdev, (uint8_t*)&vol_min, 2);
       };
           break;
@@ -928,12 +936,7 @@ static void AUDIO_REQ_GetRes(USBD_HandleTypeDef* pdev, USBD_SetupReqTypedef* req
   if ((req->bmRequest & 0x1f) == AUDIO_CONTROL_REQ) {
     switch (HIBYTE(req->wValue)) {
       case AUDIO_CONTROL_REQ_FU_VOL: {
-        /**
-         * Volume step. Be careful that total number of steps can't be too many, 
-         * host will complain.
-         * See UAC Spec 1.0 p.77
-         */
-        uint16_t vol_res = 0x0100;
+        int16_t vol_res = USBD_AUDIO_VOL_STEP;
         USBD_CtlSendData(pdev, (uint8_t*)&vol_res, 2);
       };
           break;
@@ -992,7 +995,7 @@ static uint8_t USBD_AUDIO_EP0_RxReady(USBD_HandleTypeDef* pdev)
         case AUDIO_CONTROL_REQ_FU_VOL: {
           int16_t vol = *(int16_t*)&haudio->control.data[0];
           haudio->vol = vol;
-          ((USBD_AUDIO_ItfTypeDef*)pdev->pUserData)->VolumeCtl(VOL_TO_PERCENT(vol));
+          ((USBD_AUDIO_ItfTypeDef*)pdev->pUserData)->VolumeCtl(VOL_PERCENT(vol));
         };
             break;
       }
@@ -1080,7 +1083,7 @@ static void AUDIO_OUT_Restart(USBD_HandleTypeDef* pdev)
       fb_raw = fb_nom = fb_value = 96 << 22;
   }
 
-  ((USBD_AUDIO_ItfTypeDef*)pdev->pUserData)->Init(haudio->freq, VOL_TO_PERCENT(haudio->vol), 0);
+  ((USBD_AUDIO_ItfTypeDef*)pdev->pUserData)->Init(haudio->freq, VOL_PERCENT(haudio->vol), 0);
 
   tx_flag = 0U;
   all_ready = 1U;
@@ -1111,6 +1114,12 @@ uint8_t USBD_AUDIO_RegisterInterface(USBD_HandleTypeDef* pdev,
   }
   return USBD_OK;
 }
+
+/* Convert USB volume value to % */
+uint8_t VOL_PERCENT(int16_t vol) {
+  return (uint8_t)((vol - (int16_t)USBD_AUDIO_VOL_MIN) / (((int16_t)USBD_AUDIO_VOL_MAX - (int16_t)USBD_AUDIO_VOL_MIN) / 100));
+}
+
 /**
   * @}
   */
