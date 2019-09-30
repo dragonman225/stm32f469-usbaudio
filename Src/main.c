@@ -88,7 +88,6 @@ int main(void)
   /* Start Device Process */
   USBD_Start(&USBD_Device);
 
-  /* play_start is set to 1 when AUDIO_CMD_START */
   while (1) {
     if (audio_status.playing) {
       BSP_LED_On(LED1);
@@ -113,6 +112,8 @@ int main(void)
         BSP_LED_Off(LED3);
         BSP_LED_Off(LED4);
     }
+
+    HAL_Delay(100);
   }
 }
 
