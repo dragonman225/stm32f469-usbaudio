@@ -832,16 +832,18 @@ static uint8_t USBD_AUDIO_DataOut(USBD_HandleTypeDef* pdev,
     for (i = 0; i < num_of_samples; i++) {
       /* Copy one sample */
       if (haudio->bit_depth == 16U) {
-        haudio->buffer[haudio->wr_ptr++] = (uint16_t)(tmpbuf[tmpbuf_ptr + 1] << 8);
-        haudio->buffer[haudio->wr_ptr++] = *(uint16_t *)&tmpbuf[tmpbuf_ptr] >> 8;
-        haudio->buffer[haudio->wr_ptr++] = (uint16_t)(tmpbuf[tmpbuf_ptr + 3] << 8);
-        haudio->buffer[haudio->wr_ptr++] = *(uint16_t *)&tmpbuf[tmpbuf_ptr + 2] >> 8;
+        /* { 0: L_LOBYTE, 1: L_HIBYTE, 2: R_LOBYTE, 3: R_HIBYTE } */
+        haudio->buffer[haudio->wr_ptr++] = (uint16_t)(tmpbuf[tmpbuf_ptr] << 8);
+        haudio->buffer[haudio->wr_ptr++] = (uint16_t)(tmpbuf[tmpbuf_ptr + 1]);
+        haudio->buffer[haudio->wr_ptr++] = (uint16_t)(tmpbuf[tmpbuf_ptr + 2] << 8);
+        haudio->buffer[haudio->wr_ptr++] = (uint16_t)(tmpbuf[tmpbuf_ptr + 3]);
         tmpbuf_ptr += 4;
       } else {
-        haudio->buffer[haudio->wr_ptr++] = *(uint16_t *)&tmpbuf[tmpbuf_ptr + 1];
-        haudio->buffer[haudio->wr_ptr++] = *(uint16_t *)&tmpbuf[tmpbuf_ptr] >> 8;
-        haudio->buffer[haudio->wr_ptr++] = *(uint16_t *)&tmpbuf[tmpbuf_ptr + 4];
-        haudio->buffer[haudio->wr_ptr++] = *(uint16_t *)&tmpbuf[tmpbuf_ptr + 3] >> 8;
+        /* { 0: L_LOBYTE, 1: L_MDBYTE, 2: L_HIBYTE, 3: R_LOBYTE, 4: R_MDBYTE, 5: R_HIBYTE } */
+        haudio->buffer[haudio->wr_ptr++] = *(uint16_t *)&tmpbuf[tmpbuf_ptr];
+        haudio->buffer[haudio->wr_ptr++] = (uint16_t)(tmpbuf[tmpbuf_ptr + 2]);
+        haudio->buffer[haudio->wr_ptr++] = *(uint16_t *)&tmpbuf[tmpbuf_ptr + 3];
+        haudio->buffer[haudio->wr_ptr++] = (uint16_t)(tmpbuf[tmpbuf_ptr + 5]);
         tmpbuf_ptr += 6;
       }
 
