@@ -153,7 +153,7 @@
   that it is an even number and higher than 3 */
 #define AUDIO_OUT_PACKET_NUM                          8U
 /* Total size of the audio transfer buffer */
-#define AUDIO_TOTAL_BUF_SIZE                          ((uint16_t)(AUDIO_OUT_PACKET * AUDIO_OUT_PACKET_NUM))
+#define AUDIO_TOTAL_BUF_SIZE                          ((uint16_t)(AUDIO_OUT_PACKET * AUDIO_OUT_PACKET_NUM + 4))
 
 /** 
  * The minimum distance that the wr_ptr should keep before rd_ptr to 
@@ -203,7 +203,7 @@ USBD_AUDIO_ControlTypeDef;
 typedef struct
 {
   uint32_t                  alt_setting;
-  uint8_t                   buffer[AUDIO_TOTAL_BUF_SIZE];
+  uint16_t                  buffer[AUDIO_TOTAL_BUF_SIZE];
   AUDIO_OffsetTypeDef       offset;
   uint8_t                   rd_enable;
   uint16_t                  rd_ptr;
@@ -220,7 +220,7 @@ typedef struct
 {
     int8_t  (*Init)         (uint32_t  AudioFreq, uint32_t Volume, uint32_t options);
     int8_t  (*DeInit)       (uint32_t options);
-    int8_t  (*AudioCmd)     (uint8_t* pbuf, uint32_t size, uint8_t cmd);
+    int8_t  (*AudioCmd)     (uint16_t* pbuf, uint32_t size, uint8_t cmd);
     int8_t  (*VolumeCtl)    (uint8_t vol);
     int8_t  (*MuteCtl)      (uint8_t cmd);
     int8_t  (*PeriodicTC)   (uint8_t cmd);

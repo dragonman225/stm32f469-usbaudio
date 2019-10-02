@@ -805,19 +805,49 @@ static uint8_t USBD_AUDIO_DataOut(USBD_HandleTypeDef* pdev,
     }
 
     /* Update circular audio buffer */
-    if (rest < curr_length) {
-      if (rest > 0U) {
-        memcpy(&haudio->buffer[curr_pos], tmpbuf, rest);
-        curr_length -= rest;
-      }
-      if (curr_length > 0U) {
-        memcpy(&haudio->buffer[0], &tmpbuf[rest], curr_length);
-        haudio->wr_ptr = curr_length;
-      }
+    // if (rest < curr_length) {
+    //   if (rest > 0U) {
+    //     memcpy(&haudio->buffer[curr_pos], tmpbuf, rest);
+    //     curr_length -= rest;
+    //   }
+    //   if (curr_length > 0U) {
+    //     memcpy(&haudio->buffer[0], &tmpbuf[rest], curr_length);
+    //     haudio->wr_ptr = curr_length;
+    //   }
+    // } else {
+    //   if (curr_length > 0U) {
+    //     memcpy(&haudio->buffer[curr_pos], tmpbuf, curr_length);
+    //     haudio->wr_ptr += curr_length;
+    //   }
+    // }
+    
+    uint32_t num_of_samples = 0U;
+    uint32_t i, tmpbuf_ptr = 0U;
+    if (haudio->bit_depth == 16U) {
+      num_of_samples = curr_length / 4;
     } else {
-      if (curr_length > 0U) {
-        memcpy(&haudio->buffer[curr_pos], tmpbuf, curr_length);
-        haudio->wr_ptr += curr_length;
+      num_of_samples = curr_length / 6;
+    }
+
+    for (i = 0; i < num_of_samples; i++) {
+      /* Copy one sample */
+      if (haudio->bit_depth == 16U) {
+        haudio->buffer[haudio->wr_ptr++] = (uint16_t)(tmpbuf[tmpbuf_ptr + 1] << 8);
+        haudio->buffer[haudio->wr_ptr++] = *(uint16_t *)&tmpbuf[tmpbuf_ptr] >> 8;
+        haudio->buffer[haudio->wr_ptr++] = (uint16_t)(tmpbuf[tmpbuf_ptr + 3] << 8);
+        haudio->buffer[haudio->wr_ptr++] = *(uint16_t *)&tmpbuf[tmpbuf_ptr + 2] >> 8;
+        tmpbuf_ptr += 4;
+      } else {
+        haudio->buffer[haudio->wr_ptr++] = *(uint16_t *)&tmpbuf[tmpbuf_ptr + 1];
+        haudio->buffer[haudio->wr_ptr++] = *(uint16_t *)&tmpbuf[tmpbuf_ptr] >> 8;
+        haudio->buffer[haudio->wr_ptr++] = *(uint16_t *)&tmpbuf[tmpbuf_ptr + 4];
+        haudio->buffer[haudio->wr_ptr++] = *(uint16_t *)&tmpbuf[tmpbuf_ptr + 3] >> 8;
+        tmpbuf_ptr += 6;
+      }
+
+      /* Rollback if reach end of buffer */
+      if (haudio->wr_ptr >= AUDIO_TOTAL_BUF_SIZE) {
+        haudio->wr_ptr = 0U;
       }
     }
 
@@ -839,9 +869,9 @@ static uint8_t USBD_AUDIO_DataOut(USBD_HandleTypeDef* pdev,
     }
 
     /* Rollback if reach end of buffer */
-    if (haudio->wr_ptr >= AUDIO_TOTAL_BUF_SIZE) {
-      haudio->wr_ptr = 0U;
-    }
+    // if (haudio->wr_ptr >= AUDIO_TOTAL_BUF_SIZE) {
+    //   haudio->wr_ptr = 0U;
+    // }
 
     USBD_LL_PrepareReceive(pdev, AUDIO_OUT_EP, tmpbuf, AUDIO_OUT_PACKET);
   }
@@ -1116,7 +1146,8 @@ uint8_t USBD_AUDIO_RegisterInterface(USBD_HandleTypeDef* pdev,
 }
 
 /* Convert USB volume value to % */
-uint8_t VOL_PERCENT(int16_t vol) {
+uint8_t VOL_PERCENT(int16_t vol)
+{
   return (uint8_t)((vol - (int16_t)USBD_AUDIO_VOL_MIN) / (((int16_t)USBD_AUDIO_VOL_MAX - (int16_t)USBD_AUDIO_VOL_MIN) / 100));
 }
 

@@ -853,7 +853,7 @@ static uint8_t SAIx_Init(uint32_t AudioFreq)
   haudio_out_sai.Init.AudioMode = SAI_MODEMASTER_TX;
   haudio_out_sai.Init.NoDivider = SAI_MASTERDIVIDER_ENABLE;
   haudio_out_sai.Init.Protocol = SAI_FREE_PROTOCOL;
-  haudio_out_sai.Init.DataSize = SAI_DATASIZE_16;
+  haudio_out_sai.Init.DataSize = SAI_DATASIZE_24;
   haudio_out_sai.Init.FirstBit = SAI_FIRSTBIT_MSB;
   haudio_out_sai.Init.ClockStrobing = SAI_CLOCKSTROBING_FALLINGEDGE;
   haudio_out_sai.Init.Synchro = SAI_ASYNCHRONOUS;
@@ -874,8 +874,8 @@ static uint8_t SAIx_Init(uint32_t AudioFreq)
   FS Definition: Start frame + Channel Side identification
   FS Polarity: FS active Low
   FS Offset: FS asserted one bit before the first bit of slot 0 */
-  haudio_out_sai.FrameInit.FrameLength = 64;
-  haudio_out_sai.FrameInit.ActiveFrameLength = 32;
+  haudio_out_sai.FrameInit.FrameLength = 128;
+  haudio_out_sai.FrameInit.ActiveFrameLength = 64;
   haudio_out_sai.FrameInit.FSDefinition = SAI_FS_CHANNEL_IDENTIFICATION;
   haudio_out_sai.FrameInit.FSPolarity = SAI_FS_ACTIVE_LOW;
   haudio_out_sai.FrameInit.FSOffset = SAI_FS_BEFOREFIRSTBIT;
