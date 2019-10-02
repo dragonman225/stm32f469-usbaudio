@@ -141,8 +141,8 @@
 #define AUDIO_SAIx_DMAx_STREAM               DMA2_Stream3
 #define AUDIO_SAIx_DMAx_CHANNEL              DMA_CHANNEL_0
 #define AUDIO_SAIx_DMAx_IRQ                  DMA2_Stream3_IRQn
-#define AUDIO_SAIx_DMAx_PERIPH_DATA_SIZE     DMA_PDATAALIGN_HALFWORD
-#define AUDIO_SAIx_DMAx_MEM_DATA_SIZE        DMA_MDATAALIGN_HALFWORD
+#define AUDIO_SAIx_DMAx_PERIPH_DATA_SIZE     DMA_PDATAALIGN_WORD
+#define AUDIO_SAIx_DMAx_MEM_DATA_SIZE        DMA_MDATAALIGN_WORD
 #define DMA_MAX_SZE                          0xFFFF
 
 #define AUDIO_SAIx_DMAx_IRQHandler           DMA2_Stream3_IRQHandler

@@ -52,7 +52,7 @@
 /* Private function prototypes -----------------------------------------------*/
 static int8_t Audio_Init(uint32_t AudioFreq, uint32_t Volume, uint32_t options);
 static int8_t Audio_DeInit(uint32_t options);
-static int8_t Audio_PlaybackCmd(uint8_t* pbuf, uint32_t size, uint8_t cmd);
+static int8_t Audio_PlaybackCmd(uint16_t* pbuf, uint32_t size, uint8_t cmd);
 static int8_t Audio_VolumeCtl(uint8_t vol);
 static int8_t Audio_MuteCtl(uint8_t cmd);
 static int8_t Audio_PeriodicTC(uint8_t cmd);
@@ -114,16 +114,16 @@ static int8_t Audio_DeInit(uint32_t options)
  * @retval Result of the operation: USBD_OK if all operations are OK else
  * USBD_FAIL
  */
-static int8_t Audio_PlaybackCmd(uint8_t* pbuf, uint32_t size, uint8_t cmd)
+static int8_t Audio_PlaybackCmd(uint16_t* pbuf, uint32_t size, uint8_t cmd)
 {
   switch (cmd) {
     case AUDIO_CMD_START:
-      BSP_AUDIO_OUT_Play((uint16_t*)pbuf, 2 * size);
+      BSP_AUDIO_OUT_Play(pbuf, 2 * size);
       audio_status.playing = 1U;
       break;
 
     case AUDIO_CMD_PLAY:
-      BSP_AUDIO_OUT_ChangeBuffer((uint16_t*)pbuf, 2 * size);
+      BSP_AUDIO_OUT_ChangeBuffer(pbuf, 2 * size);
       audio_status.playing = 1U;
       break;
   }
