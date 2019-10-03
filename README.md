@@ -21,10 +21,10 @@ This project is based on [STM32469I-Discovery "AUDIO_Standalone" Example](https:
 
 * Using asynchronous mode for isochronous transfer.
   * 1 ISO OUT endpoint for PCM data, 1 ISO IN endpoint for feedback.
-* Currently support 16-bit, 44.1 kHz, 48 kHz, 96 kHz, stereo PCM audio. Planned to support 24-bit.
+* Support 16-bit / 24-bit, 44.1 kHz / 48 kHz / 96 kHz, stereo PCM audio.
 * Support mute, volume, frequency control from USB host.
   * Mute and volume control commands are passed to CS43L22 codec.
-  * Frequency control commands change the PLL settings on MCU to generate different MCLK for SAI.
+  * Frequency control commands change the PLL settings on MCU to generate different MCLK for SAI block.
 * Implement USB Audio Class 1.0 on USB OTG Full-speed core.
 
 ## For User
@@ -217,18 +217,24 @@ Device Descriptor:
 
 ```bash
 $ watch -n cat /proc/asound/cardX/stream0                                                    
-Dragonode Audio Venus DAC at usb-0000:00:14.0-1, full speed : USB Audio
+Dragonode Audio Venus DAC at usb-0000:00:02.0-3, full speed : USB Audio
 
 Playback:
   Status: Running
     Interface = 1
-    Altset = 1
-    Packet Size = 268
-    Momentary freq = 44430 Hz (0x2c.6e24)
+    Altset = 2
+    Packet Size = 432
+    Momentary freq = 47569 Hz (0x2f.918c)
     Feedback Format = 10.14
   Interface 1
     Altset 1
     Format: S16_LE
+    Channels: 2
+    Endpoint: 1 OUT (ASYNC)
+    Rates: 44100, 48000, 96000
+  Interface 1
+    Altset 2
+    Format: S24_3LE
     Channels: 2
     Endpoint: 1 OUT (ASYNC)
     Rates: 44100, 48000, 96000
@@ -247,17 +253,76 @@ $ dmesg
 
 ## Firmware Architecture
 
-* Circular Buffer *TBD*
-* Feedback *TBD*
+* Incoming (USB) to outgoing (I2S) buffer chain (bit width, byte alignment, config) *TBD*
+  * USB buffer : 16-bit or 24-bit frame, little-endian -> Audio buffer : 32-bit frame, right-aligned, little-endian -> 32-bit DMA -> SAI FIFO (32-bit width)
+* Feedback (method & algorithm) *TBD*
+  * Calculate by timer.
+  * Calculate by remaining buffer size.
 * USB Interrupts & data flow *TBD*
 * Relationship between USB class driver, main program, audio codec and SAI. *TBD*
 
 ## Technical Highlight
 
 * `PCD_HandleTypeDef->Init->Sof_enable` ([`Src/usbd_conf.c:274`](https://github.com/dragonman225/stm32f469-usbaudio/blob/9d58b8c0d2e16ad177b0d531f47a877ad5596508/Src/usbd_conf.c#L274)) must be 1 to enable SOF (Start-of-frame) interrupt.
+
 * The second parameter of `HAL_PCDEx_SetTxFiFo(&hpcd, 1, 0x60)` ([`Src/usbd_conf.c:287`](https://github.com/dragonman225/stm32f469-usbaudio/blob/9d58b8c0d2e16ad177b0d531f47a877ad5596508/Src/usbd_conf.c#L287)) must be > 0 so that there is FIFO to store Tx data (in this case, the feedback data). If it's 0, there will be bugs described [here](https://github.com/dragonman225/stm32f469-usbaudio/issues/1).
+
 * Feedback data byte order. *TBD*
+
 * When to recv / send data ? USB IN / OUT / SOF token. *TBD*
+
+* USB volume to Codec volume mapping. *TBD*
+
+* Extending 16-bit to 24-bit
+  
+  * DMA
+    
+    Set `DMA_HandleTypeDef.Init.PeriphDataAlignment` to `DMA_PDATAALIGN_WORD` and `DMA_HandleTypeDef.Init.MemDataAlignment` to `DMA_MDATAALIGN_WORD`.
+    
+    This means we need to wrap 24-bit audio sample in 32-bit structure.
+    
+    > A DMA transaction consists of a sequence of a given number of data transfers. The number of data items to be transferred and their width (8-bit, 16-bit or 32-bit) are software-programmable. 
+    > 
+    > *RM0386 Reference Manual - 9.3.3 DMA transactions*
+    
+  * SAI
+  
+    Set `SAI_HandleTypeDef.Init.DataSize` to `SAI_DATASIZE_24`.
+  
+    Set `SAI_HandleTypeDef.FrameInit.FrameLength` to `128`.
+  
+    Set `SAI_HandleTypeDef.FrameInit.ActiveFrameLength` to `64`.
+  
+  * USB
+  
+    * Set `USBD_MAX_NUM_INTERFACES`(`Inc/usbd_conf.h:58`) to `2`.
+  
+    * Add an **Audio Streaming Interface Descriptor** with `bAlternateSetting` set to `2`.
+  
+      Set `bSubFrameSize` to `0x03` and `bBitResolution` to `0x18`.
+      
+    * Open OUT EP with max packet size of 24-bit / 96 kHz
+      ```c
+      USBD_LL_OpenEP(pdev, AUDIO_OUT_EP, USBD_EP_TYPE_ISOC, AUDIO_OUT_PACKET_24B);
+      ```
+      
+    * Handle `SET_INTERFACE` request in **Setup** stage. e.g. Set a flag to let other processes know it's 24-bit data.
+  
+    * Extend 16-bit or 24-bit data to 32-bit
+  
+      Note that ARM is little-endian. Consider the following :
+  
+      ```c
+      uint8_t tmpbuf[2] = { 0x34, 0x12 };
+      // *(uint16_t*)&tmpbuf[0] is 0x1234
+      ```
+  
+    * USB Device Rx FIFO size must be sufficiently large ( > Max audio payload size + USB Header ). At the same time Tx FIFO size may need to be shrunk so that total FIFO size doesn't exceed the limit (In Full-speed : 1.25 Kbytes, 0x140 words). [Ref : *STM32 Cube USB Host wmaxpacketsize problem*](https://community.st.com/s/question/0D50X00009XkglOSAR/stm32-cube-usb-host-wmaxpacketsize-problem)
+  
+      ```c
+      HAL_PCDEx_SetRxFiFo(&hpcd, 0x110);
+      HAL_PCDEx_SetTxFiFo(&hpcd, 1, 0x10);
+      ```
 
 ## Background Knowledge
 
