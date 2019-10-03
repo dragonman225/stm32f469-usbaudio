@@ -20,12 +20,30 @@ This project is based on [STM32469I-Discovery "AUDIO_Standalone" Example](https:
 ## Feature
 
 * Using asynchronous mode for isochronous transfer.
+  
   * 1 ISO OUT endpoint for PCM data, 1 ISO IN endpoint for feedback.
+  
 * Support 16-bit / 24-bit, 44.1 kHz / 48 kHz / 96 kHz, stereo PCM audio.
+
 * Support mute, volume, frequency control from USB host.
   * Mute and volume control commands are passed to CS43L22 codec.
   * Frequency control commands change the PLL settings on MCU to generate different MCLK for SAI block.
+  
 * Implement USB Audio Class 1.0 on USB OTG Full-speed core.
+
+* LED status indicator
+
+  **Green LED** : ON when playing.
+
+  **Orange LED** : ON when buffer overrun (with audible distortion).
+
+  **Red and Blue LED** : Depend on audio data frequency.
+
+  | Frequency | Red LED | Blue LED |
+  | :-------: | :-----: | :------: |
+  | 44.1 kHz  |   ON    |    -     |
+  |  48 kHz   |    -    |    ON    |
+  |  96 kHz   |   ON    |    ON    |
 
 ## For User
 
