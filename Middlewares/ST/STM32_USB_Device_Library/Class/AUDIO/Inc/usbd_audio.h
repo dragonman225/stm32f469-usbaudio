@@ -85,7 +85,7 @@
 
 #define SOF_RATE                                      0x02U
 
-#define USB_AUDIO_CONFIG_DESC_SIZ                     0x7CU
+#define USB_AUDIO_CONFIG_DESC_SIZ                     0xb6U
 #define AUDIO_INTERFACE_DESC_SIZE                     0x09U
 #define USB_AUDIO_DESC_SIZ                            0x09U
 #define AUDIO_STANDARD_ENDPOINT_DESC_SIZE             0x09U
@@ -144,7 +144,17 @@
 #define AUDIO_STREAMING_REQ_FREQ_CTRL                 0x01U
 #define AUDIO_STREAMING_REQ_PITCH_CTRL                0x02U
 
-#define AUDIO_OUT_PACKET                              (uint16_t)(((USBD_AUDIO_FREQ_MAX * 2U * 2U) / 1000U) + 4)
+/*
+ * Max packet size: (freq / 1000 + extra_samples) * channels * bytes_per_sample
+ * e.g. (96000 / 1000 + 1) * 2(stereo) * 2(16bit) = 388
+ */
+#define AUDIO_OUT_PACKET_16B                          ((uint16_t)((USBD_AUDIO_FREQ_MAX / 1000U + 1) * 2U * 2U))
+
+/*
+ * Max packet size: (freq / 1000 + extra_samples) * channels * bytes_per_sample
+ * e.g. (96000 / 1000 + 1) * 2(stereo) * 3(24bit) = 582
+ */
+#define AUDIO_OUT_PACKET_24B                          ((uint16_t)((USBD_AUDIO_FREQ_MAX / 1000U + 1) * 2U * 3U))
 
 /* Input endpoint is for feedback. See USB 1.1 Spec, 5.10.4.2 Feedback. */
 #define AUDIO_IN_PACKET                               3U
@@ -152,14 +162,15 @@
 /* Number of sub-packets in the audio transfer buffer. You can modify this value but always make sure
   that it is an even number and higher than 3 */
 #define AUDIO_OUT_PACKET_NUM                          8U
+
 /* Total size of the audio transfer buffer */
-#define AUDIO_TOTAL_BUF_SIZE                          ((uint16_t)(AUDIO_OUT_PACKET * AUDIO_OUT_PACKET_NUM + 4))
+#define AUDIO_TOTAL_BUF_SIZE                          ((uint16_t)((USBD_AUDIO_FREQ_MAX / 1000U + 1) * 2U * 4U * AUDIO_OUT_PACKET_NUM))
 
 /** 
  * The minimum distance that the wr_ptr should keep before rd_ptr to 
  * prevent overwriting unplayed buffer
  */
-#define AUDIO_BUF_SAFEZONE                            AUDIO_OUT_PACKET
+#define AUDIO_BUF_SAFEZONE                            ((uint16_t)((USBD_AUDIO_FREQ_MAX / 1000U + 1) * 2U * 4U))
 
     /* Audio Commands enumeration */
 typedef enum
