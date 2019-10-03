@@ -163,10 +163,13 @@ sudo wireshark
 ```c
 # Device address
 usb.device_address == 123
+  
 # Endpoint 1, IN direction
 usb.endpoint_address == 0x81
+  
 # Frame length. Valid feedback packet is 83 bytes (80 bytes header and 3 bytes data).
 frame.len == 83
+  
 # bRequest can be used to filter control packets
 usb.setup.bRequest == 11
 ```
@@ -343,7 +346,17 @@ $ dmesg
 ### STM32
 
 * [UM1021 STM32 USB OTG Library User Manual](https://www.st.com/content/ccc/resource/technical/document/user_manual/1c/6b/06/e6/19/6c/46/bf/CD00289278.pdf/files/CD00289278.pdf/jcr:content/translations/en.CD00289278.pdf) The architecture of ST's USB library and how to use it.
+
 * [STM32 之三 标准外设版USB驱动库详解](https://blog.csdn.net/ZCShouCSDN/article/details/78936456) 大致與 UM1021 的內容相同（中文）
+
 * [UM1725 Description of STM32F4 HAL and LL drivers](https://www.st.com/content/ccc/resource/technical/document/user_manual/2f/71/ba/b8/75/54/47/cf/DM00105879.pdf/files/DM00105879.pdf/jcr:content/translations/en.DM00105879.pdf) Chapter 47 and 48 are USB-related. The UM1201 USB library relies on these drivers to do low level work.
+
 * [RM0386 STM32F469xx and STM32F479xx Reference Manual](https://www.st.com/content/ccc/resource/technical/document/reference_manual/29/77/09/5a/b1/60/4e/bd/DM00127514.pdf/files/DM00127514.pdf/jcr:content/translations/en.DM00127514.pdf) The documentation for the MCU itself, it's mostly about peripheral registers. HAL and LL drivers translate software commands to electrical actions by manipulating these registers. 
+
+  **Important chapters :**
+
+  * **9 Direct memory access controller (DMA)**
+  * **32 Serial audio interface (SAI)**
+  * **35 USB on-the-go full-speed/high-speed (OTG_FS/OTG_HS)**
+
 * [ChibiOS forum - Usage of USB driver in isochronous mode (STM32)](http://www.chibios.com/forum/viewtopic.php?f=16&t=926) Register level details about gotchas in implementing audio class with STM32 USB hardware stack. After some investigations, I think the problems described there seem to be solved in the latest STM32F4xx LL / HAL driver.
