@@ -414,7 +414,7 @@ __ALIGN_BEGIN static uint8_t USBD_AUDIO_CfgDesc[USB_AUDIO_CONFIG_DESC_SIZ] __ALI
     0x01,                              /* bInterval 1ms */
     SOF_RATE,                          /* bRefresh 4ms = 2^2 */
     0x00,                              /* bSynchAddress */
-    /* 09 byte*/
+                                       /* 09 byte*/
 };
 
 /** 
@@ -470,7 +470,7 @@ static uint8_t USBD_AUDIO_Init(USBD_HandleTypeDef* pdev, uint8_t cfgidx)
   USBD_AUDIO_HandleTypeDef* haudio;
 
   /* Open EP OUT */
-  USBD_LL_OpenEP(pdev, AUDIO_OUT_EP, USBD_EP_TYPE_ISOC, AUDIO_OUT_PACKET_16B);
+  USBD_LL_OpenEP(pdev, AUDIO_OUT_EP, USBD_EP_TYPE_ISOC, AUDIO_OUT_PACKET_24B);
   pdev->ep_out[AUDIO_OUT_EP & 0xFU].is_used = 1U;
 
   /* Open EP IN */
@@ -710,15 +710,6 @@ static uint8_t USBD_AUDIO_SOF(USBD_HandleTypeDef* pdev)
   haudio = (USBD_AUDIO_HandleTypeDef*)pdev->pClassData;
 
   /**
-   * Order of 3 bytes in feedback packet: { LO byte, MID byte, HI byte }
-   * 
-   * For example,
-   * 48.000(dec) => 300000(hex, 8.16) => 0C0000(hex, 10.14) => transmit { 00, 00, 0C }
-   * 
-   * Note that ALSA accepts 8.16 format.
-   */
-
-  /**
    * 1. Must be static so that the values are kept when the function is 
    *    again called.
    * 2. Must be volatile so that it will not be optimized out by the compiler.
@@ -755,11 +746,14 @@ static uint8_t USBD_AUDIO_SOF(USBD_HandleTypeDef* pdev)
     if (sof_count == 1U) {
       sof_count = 0;
       /* Calculate feedback value based on the change of writable buffer size */
-      // int32_t audio_buf_writable_size_change;
+      /* v2 */
       int32_t audio_buf_writable_size_dev_from_nom;
-      // audio_buf_writable_size_change = audio_buf_writable_size - audio_buf_writable_size_last;
       audio_buf_writable_size_dev_from_nom = audio_buf_writable_size - (AUDIO_TOTAL_BUF_SIZE >> 1);
-      fb_value += audio_buf_writable_size_dev_from_nom * 2702;
+      // fb_value += audio_buf_writable_size_dev_from_nom * 1352;
+      fb_value += audio_buf_writable_size_dev_from_nom * audio_buf_writable_size_dev_from_nom / 912673 * 128 * audio_buf_writable_size_dev_from_nom;
+      /* v1 */
+      // int32_t audio_buf_writable_size_change;
+      // audio_buf_writable_size_change = audio_buf_writable_size - audio_buf_writable_size_last;
       // fb_raw += audio_buf_writable_size_change * 0x1000;
       // fb_value = (uint32_t)fb_raw;
 
@@ -774,6 +768,14 @@ static uint8_t USBD_AUDIO_SOF(USBD_HandleTypeDef* pdev)
       }
 
       /* Set 10.14 format feedback data */
+      /**
+       * Order of 3 bytes in feedback packet: { LO byte, MID byte, HI byte }
+       * 
+       * For example,
+       * 48.000(dec) => 300000(hex, 8.16) => 0C0000(hex, 10.14) => packet { 00, 00, 0C }
+       * 
+       * Note that ALSA accepts 8.16 format.
+       */
       fb_data[0] = (fb_value & 0x0000FF00) >> 8;
       fb_data[1] = (fb_value & 0x00FF0000) >> 16;
       fb_data[2] = (fb_value & 0xFF000000) >> 24;
@@ -892,7 +894,7 @@ static uint8_t USBD_AUDIO_DataOut(USBD_HandleTypeDef* pdev,
     //     haudio->wr_ptr += curr_length;
     //   }
     // }
-    
+
     uint32_t num_of_samples = 0U;
     uint32_t i, tmpbuf_ptr = 0U;
     if (haudio->bit_depth == 16U) {
@@ -912,9 +914,9 @@ static uint8_t USBD_AUDIO_DataOut(USBD_HandleTypeDef* pdev,
         tmpbuf_ptr += 4;
       } else {
         /* { 0: L_LOBYTE, 1: L_MDBYTE, 2: L_HIBYTE, 3: R_LOBYTE, 4: R_MDBYTE, 5: R_HIBYTE } */
-        haudio->buffer[haudio->wr_ptr++] = *(uint16_t *)&tmpbuf[tmpbuf_ptr];
+        haudio->buffer[haudio->wr_ptr++] = *(uint16_t*)&tmpbuf[tmpbuf_ptr];
         haudio->buffer[haudio->wr_ptr++] = (uint16_t)(tmpbuf[tmpbuf_ptr + 2]);
-        haudio->buffer[haudio->wr_ptr++] = *(uint16_t *)&tmpbuf[tmpbuf_ptr + 3];
+        haudio->buffer[haudio->wr_ptr++] = *(uint16_t*)&tmpbuf[tmpbuf_ptr + 3];
         haudio->buffer[haudio->wr_ptr++] = (uint16_t)(tmpbuf[tmpbuf_ptr + 5]);
         tmpbuf_ptr += 6;
       }
