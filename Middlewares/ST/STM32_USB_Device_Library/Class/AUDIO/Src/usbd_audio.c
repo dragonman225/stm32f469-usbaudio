@@ -870,30 +870,11 @@ static uint8_t USBD_AUDIO_DataOut(USBD_HandleTypeDef* pdev,
 
   if (all_ready == 1U && epnum == AUDIO_OUT_EP) {
     uint32_t curr_length = USBD_GetRxCount(pdev, epnum);
-    uint32_t curr_pos = haudio->wr_ptr;
-    uint32_t rest = AUDIO_TOTAL_BUF_SIZE - curr_pos;
 
     /* Ignore strangely large packets */
     if (curr_length > AUDIO_OUT_PACKET_24B) {
       curr_length = 0U;
     }
-
-    /* Update circular audio buffer */
-    // if (rest < curr_length) {
-    //   if (rest > 0U) {
-    //     memcpy(&haudio->buffer[curr_pos], tmpbuf, rest);
-    //     curr_length -= rest;
-    //   }
-    //   if (curr_length > 0U) {
-    //     memcpy(&haudio->buffer[0], &tmpbuf[rest], curr_length);
-    //     haudio->wr_ptr = curr_length;
-    //   }
-    // } else {
-    //   if (curr_length > 0U) {
-    //     memcpy(&haudio->buffer[curr_pos], tmpbuf, curr_length);
-    //     haudio->wr_ptr += curr_length;
-    //   }
-    // }
 
     uint32_t num_of_samples = 0U;
     uint32_t i, tmpbuf_ptr = 0U;
@@ -928,8 +909,9 @@ static uint8_t USBD_AUDIO_DataOut(USBD_HandleTypeDef* pdev,
     }
 
     /* Start playing when half of the audio buffer is filled */
-    if (haudio->wr_ptr >= AUDIO_TOTAL_BUF_SIZE / 2U) {
-      if (haudio->offset == AUDIO_OFFSET_UNKNOWN && is_playing == 0U) {
+    if (haudio->offset == AUDIO_OFFSET_UNKNOWN && is_playing == 0U) {
+      if (haudio->wr_ptr >= AUDIO_TOTAL_BUF_SIZE / 2U) {
+        haudio->offset = AUDIO_OFFSET_NONE;
         is_playing = 1U;
 
         if (haudio->rd_enable == 0U) {
@@ -938,16 +920,9 @@ static uint8_t USBD_AUDIO_DataOut(USBD_HandleTypeDef* pdev,
           audio_buf_writable_size_last = AUDIO_TOTAL_BUF_SIZE - haudio->wr_ptr;
         }
 
-        haudio->offset = AUDIO_OFFSET_NONE;
-
         ((USBD_AUDIO_ItfTypeDef*)pdev->pUserData)->AudioCmd(&haudio->buffer[0], AUDIO_TOTAL_BUF_SIZE / 2U, AUDIO_CMD_START);
       }
     }
-
-    /* Rollback if reach end of buffer */
-    // if (haudio->wr_ptr >= AUDIO_TOTAL_BUF_SIZE) {
-    //   haudio->wr_ptr = 0U;
-    // }
 
     USBD_LL_PrepareReceive(pdev, AUDIO_OUT_EP, tmpbuf, AUDIO_OUT_PACKET_24B);
   }
