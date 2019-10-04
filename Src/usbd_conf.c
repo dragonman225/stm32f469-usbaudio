@@ -283,7 +283,11 @@ USBD_StatusTypeDef USBD_LL_Init(USBD_HandleTypeDef *pdev)
   /* Initialize LL Driver */
   HAL_PCD_Init(&hpcd);
   
-  HAL_PCDEx_SetRxFiFo(&hpcd, 0x110);
+  /* Set Rx FIFO */
+  HAL_PCDEx_SetRxFiFo(&hpcd, 0xf0);
+  /* Set Tx0 FIFO (for EP0 IN) */
+  HAL_PCDEx_SetTxFiFo(&hpcd, 0, 0x40);
+  /* Set Tx1 FIFO (for EP1 IN) */
   HAL_PCDEx_SetTxFiFo(&hpcd, 1, 0x10);
   
   return USBD_OK;
