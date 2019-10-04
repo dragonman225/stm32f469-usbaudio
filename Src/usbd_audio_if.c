@@ -118,12 +118,12 @@ static int8_t Audio_PlaybackCmd(uint16_t* pbuf, uint32_t size, uint8_t cmd)
 {
   switch (cmd) {
     case AUDIO_CMD_START:
-      BSP_AUDIO_OUT_Play(pbuf, 2 * size);
+      BSP_AUDIO_OUT_Play(pbuf, size);
       audio_status.playing = 1U;
       break;
 
     case AUDIO_CMD_PLAY:
-      BSP_AUDIO_OUT_ChangeBuffer(pbuf, 2 * size);
+      BSP_AUDIO_OUT_ChangeBuffer(pbuf, size);
       audio_status.playing = 1U;
       break;
   }

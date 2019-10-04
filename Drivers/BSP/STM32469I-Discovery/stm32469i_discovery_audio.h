@@ -207,7 +207,7 @@
              CONFIGURATION: Audio Driver Configuration parameters
 ------------------------------------------------------------------------------*/
 
-#define AUDIODATA_SIZE                      2   /* 16-bits audio data size */
+#define AUDIODATA_SIZE                      4   /* 16-bit or 24-bit audio sample in 32-bit frame */
 
 /* Audio status definition */
 #define AUDIO_OK                            ((uint8_t)0)
