@@ -35,6 +35,7 @@
 
 extern PCD_HandleTypeDef hpcd;
 extern SAI_HandleTypeDef haudio_out_sai;
+extern I2S_HandleTypeDef haudio_out_i2s;
 
 /* Private function prototypes -----------------------------------------------*/
 /* Private functions ---------------------------------------------------------*/
@@ -159,13 +160,23 @@ void OTG_FS_IRQHandler(void)
 }
 
 /**
-  * @brief This function handles DMA2 Stream 4 interrupt request.
+  * @brief This function handles DMA2 Stream 3 interrupt request.
   * @param None
   * @retval None
   */
 void DMA2_Stream3_IRQHandler(void)
 {
   HAL_DMA_IRQHandler(haudio_out_sai.hdmatx);
+}
+
+/**
+  * @brief This function handles DMA1 Stream 4 interrupt request.
+  * @param None
+  * @retval None
+  */
+void DMA1_Stream4_IRQHandler(void)
+{
+  HAL_DMA_IRQHandler(haudio_out_i2s.hdmatx);
 }
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

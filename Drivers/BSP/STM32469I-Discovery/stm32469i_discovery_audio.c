@@ -803,9 +803,10 @@ __weak void BSP_AUDIO_OUT_ClockConfig(SAI_HandleTypeDef *hsai, uint32_t AudioFre
     /* PLLI2S_VCO: VCO_429M
     I2S_CLK(first level) = PLLI2S_VCO/PLLI2SQ = 429/2 = 214.5 Mhz
     I2S_CLK_x = I2S_CLK(first level)/PLLI2SDIVQ = 214.5/19 = 11.289 Mhz */
-    rcc_ex_clk_init_struct.PeriphClockSelection = RCC_PERIPHCLK_SAI_PLLI2S;
+    rcc_ex_clk_init_struct.PeriphClockSelection = RCC_PERIPHCLK_I2S | RCC_PERIPHCLK_SAI_PLLI2S;
     rcc_ex_clk_init_struct.PLLI2S.PLLI2SN = 429;
     rcc_ex_clk_init_struct.PLLI2S.PLLI2SQ = 2;
+    rcc_ex_clk_init_struct.PLLI2S.PLLI2SR = 7;
     rcc_ex_clk_init_struct.PLLI2SDivQ = 19;
     
     HAL_RCCEx_PeriphCLKConfig(&rcc_ex_clk_init_struct);
@@ -817,9 +818,10 @@ __weak void BSP_AUDIO_OUT_ClockConfig(SAI_HandleTypeDef *hsai, uint32_t AudioFre
     PLLSAI_VCO: VCO_344M 
     I2S_CLK(first level) = PLLI2S_VCO/PLLI2SQ = 344/7 = 49.142 Mhz 
     I2S_CLK_x = SAI_CLK(first level)/PLLI2SDIVQ = 49.142/1 = 49.142 Mhz */  
-    rcc_ex_clk_init_struct.PeriphClockSelection = RCC_PERIPHCLK_SAI_PLLI2S;
+    rcc_ex_clk_init_struct.PeriphClockSelection = RCC_PERIPHCLK_I2S | RCC_PERIPHCLK_SAI_PLLI2S;
     rcc_ex_clk_init_struct.PLLI2S.PLLI2SN = 344; 
     rcc_ex_clk_init_struct.PLLI2S.PLLI2SQ = 7; 
+    rcc_ex_clk_init_struct.PLLI2S.PLLI2SR = 7;
     rcc_ex_clk_init_struct.PLLI2SDivQ = 1;       
     
     HAL_RCCEx_PeriphCLKConfig(&rcc_ex_clk_init_struct);

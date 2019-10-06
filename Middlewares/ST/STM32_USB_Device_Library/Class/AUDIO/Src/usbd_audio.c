@@ -885,20 +885,53 @@ static uint8_t USBD_AUDIO_DataOut(USBD_HandleTypeDef* pdev,
     }
 
     for (i = 0; i < num_of_samples; i++) {
+      /**
+       * tmpbuf byte order (USB is little-endian):
+       * 16-bit sample { 0: L_LOBYTE, 1: L_HIBYTE, 2: R_LOBYTE, 3: R_HIBYTE }
+       * 24-bit sample { 0: L_LOBYTE, 1: L_MDBYTE, 2: L_HIBYTE, 3: R_LOBYTE, 4: R_MDBYTE, 5: R_HIBYTE }
+       * 
+       * audio frame byte order (32-bit frame, LSB-Justified):
+       * 16-bit { 0:   0x00, 1: LOBYTE, 2: HIBYTE, 3: 0x00 }
+       * 24-bit { 0: LOBYTE, 1: MDBYTE, 2: HIBYTE, 3: 0x00 }
+       * 
+       * DMA example: (assume there's a frame in memory { 0x56, 0x34, 0x12, 0x00 })
+       * - ARM is little-endian.
+       * SAI reg width is 32-bit, the frame need 1 DMA transfer: 0x00123456.
+       * - Since SAI DataSize is 24-bit, 0x123456 is sent.
+       * I2S reg width is 16-bit, the frame need 2 DMA transfers: First, 0x3456. Then, 0x0012.
+       * - Since I2S DataFormat is 24-bit, Standard is LSB, 0x560012 is sent.
+       * - If we want to send 0x123456, we need to change the byte order in memory!
+       */
       /* Copy one sample */
       if (haudio->bit_depth == 16U) {
-        /* { 0: L_LOBYTE, 1: L_HIBYTE, 2: R_LOBYTE, 3: R_HIBYTE } */
+        /* SAI */
         haudio->buffer[haudio->wr_ptr++] = (uint16_t)(tmpbuf[tmpbuf_ptr] << 8);
         haudio->buffer[haudio->wr_ptr++] = (uint16_t)(tmpbuf[tmpbuf_ptr + 1]);
         haudio->buffer[haudio->wr_ptr++] = (uint16_t)(tmpbuf[tmpbuf_ptr + 2] << 8);
         haudio->buffer[haudio->wr_ptr++] = (uint16_t)(tmpbuf[tmpbuf_ptr + 3]);
+
+        /* I2S */
+        // haudio->buffer[haudio->wr_ptr++] = (uint16_t)(tmpbuf[tmpbuf_ptr + 1]);
+        // haudio->buffer[haudio->wr_ptr++] = (uint16_t)(tmpbuf[tmpbuf_ptr] << 8);
+        // haudio->buffer[haudio->wr_ptr++] = (uint16_t)(tmpbuf[tmpbuf_ptr + 3]);
+        // haudio->buffer[haudio->wr_ptr++] = (uint16_t)(tmpbuf[tmpbuf_ptr + 2] << 8);
+
+        /* Increase pointer */
         tmpbuf_ptr += 4;
       } else {
-        /* { 0: L_LOBYTE, 1: L_MDBYTE, 2: L_HIBYTE, 3: R_LOBYTE, 4: R_MDBYTE, 5: R_HIBYTE } */
+        /* SAI */
         haudio->buffer[haudio->wr_ptr++] = *(uint16_t*)&tmpbuf[tmpbuf_ptr];
         haudio->buffer[haudio->wr_ptr++] = (uint16_t)(tmpbuf[tmpbuf_ptr + 2]);
         haudio->buffer[haudio->wr_ptr++] = *(uint16_t*)&tmpbuf[tmpbuf_ptr + 3];
         haudio->buffer[haudio->wr_ptr++] = (uint16_t)(tmpbuf[tmpbuf_ptr + 5]);
+
+        /* I2S */
+        // haudio->buffer[haudio->wr_ptr++] = (uint16_t)(tmpbuf[tmpbuf_ptr + 2]);
+        // haudio->buffer[haudio->wr_ptr++] = *(uint16_t*)&tmpbuf[tmpbuf_ptr];
+        // haudio->buffer[haudio->wr_ptr++] = (uint16_t)(tmpbuf[tmpbuf_ptr + 5]);
+        // haudio->buffer[haudio->wr_ptr++] = *(uint16_t*)&tmpbuf[tmpbuf_ptr + 3];
+
+        /* Increase pointer */
         tmpbuf_ptr += 6;
       }
 

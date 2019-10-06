@@ -345,6 +345,10 @@ $ dmesg
       HAL_PCDEx_SetTxFiFo(&hpcd, 1, 0x10);
       ```
 
+* Setup I2S + DMA
+
+  * I2S MCLK stays low when there is no data to be sent ([proof](http://wiki.csie.ncku.edu.tw/embedded/SPI#%E7%A4%BA%E6%B3%A2%E5%99%A8%E5%9C%96%E8%A7%A3)). So if DMA is not configured correctly, no signal can be observed at I2S pins.
+
 ## Background Knowledge
 
 ### USB & USB Audio Class

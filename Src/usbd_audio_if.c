@@ -45,6 +45,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "usbd_audio_if.h"
 #include "stm32469i_discovery_audio.h"
+#include "stm32469i_discovery_ext_i2s2.h"
 
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
@@ -85,6 +86,7 @@ static int8_t Audio_Init(uint32_t AudioFreq, uint32_t Volume, uint32_t options)
 {
   audio_status.frequency = AudioFreq;
   BSP_AUDIO_OUT_Init(OUTPUT_DEVICE_AUTO, Volume, AudioFreq);
+  EXT_I2S2_Init(AudioFreq);
 
   /* Update the Audio frame slot configuration to match the PCM standard
    * instead of TDM */
@@ -103,6 +105,7 @@ static int8_t Audio_DeInit(uint32_t options)
 {
   audio_status.playing = 0U;
   BSP_AUDIO_OUT_Stop(CODEC_PDWN_SW);
+  EXT_I2S2_DeInit();
   return 0;
 }
 
@@ -119,6 +122,7 @@ static int8_t Audio_PlaybackCmd(uint16_t* pbuf, uint32_t size, uint8_t cmd)
   switch (cmd) {
     case AUDIO_CMD_START:
       BSP_AUDIO_OUT_Play(pbuf, size);
+      EXT_I2S2_Play(pbuf, size / 4);
       audio_status.playing = 1U;
       break;
 
