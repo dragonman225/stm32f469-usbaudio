@@ -900,7 +900,7 @@ static uint8_t USBD_AUDIO_DataOut(USBD_HandleTypeDef* pdev,
        * - Since SAI DataSize is 24-bit, 0x123456 is sent.
        * I2S reg width is 16-bit, the frame need 2 DMA transfers: First, 0x3456. Then, 0x0012.
        * - Since I2S DataFormat is 24-bit, Standard is LSB, 0x560012 is sent.
-       * - If we want to send 0x123456, we need to change the byte order in memory!
+       * - If we want to send 0x123456, we need to change the half-word order in memory!
        */
       /* Copy one sample */
       if (haudio->bit_depth == 16U) {
