@@ -59,7 +59,7 @@
 
 /* Volume. See UAC Spec 1.0 p.77 */
 #ifndef USBD_AUDIO_VOL_DEFAULT
-#define USBD_AUDIO_VOL_DEFAULT                        0x8d00U
+#define USBD_AUDIO_VOL_DEFAULT                        0xdd00U //0x8d00U
 #endif
 
 #ifndef USBD_AUDIO_VOL_MAX
@@ -76,7 +76,7 @@
 
 /* Interface */
 #ifndef USBD_MAX_NUM_INTERFACES
-#define USBD_MAX_NUM_INTERFACES                       1U
+#define USBD_MAX_NUM_INTERFACES                       2U
 #endif
 
 /* bEndpointAddress, see UAC 1.0 spec, p.61 */
@@ -156,14 +156,21 @@
  */
 #define AUDIO_OUT_PACKET_24B                          ((uint16_t)((USBD_AUDIO_FREQ_MAX / 1000U + 1) * 2U * 3U))
 
-/* Input endpoint is for feedback. See USB 1.1 Spec, 5.10.4.2 Feedback. */
+/* Input endpoint is for feedback. See USB 1.1 Spec, 5.10.4.2 Feedback */
 #define AUDIO_IN_PACKET                               3U
 
-/* Number of sub-packets in the audio transfer buffer. You can modify this value but always make sure
-  that it is an even number and higher than 3 */
+/**
+ * Number of sub-packets in the audio transfer buffer. 
+ * You can modify this value but always make sure
+ * that it is an even number and higher than 3
+ */
 #define AUDIO_OUT_PACKET_NUM                          8U
 
-/* Total size of the audio transfer buffer */
+/**
+ * Total size of the audio buffer in half-words, 
+ * (AUDIO_TOTAL_BUF_SIZE * 2 / AUDIODATA_SIZE) should be within 
+ * uint16_t range due to DMA
+ */
 #define AUDIO_TOTAL_BUF_SIZE                          ((uint16_t)((USBD_AUDIO_FREQ_MAX / 1000U + 1) * 2U * 4U * AUDIO_OUT_PACKET_NUM))
 
 /** 
@@ -172,13 +179,14 @@
  */
 #define AUDIO_BUF_SAFEZONE                            ((uint16_t)((USBD_AUDIO_FREQ_MAX / 1000U + 1) * 2U * 4U))
 
-    /* Audio Commands enumeration */
+/* Audio Commands enumeration */
 typedef enum
 {
   AUDIO_CMD_START = 1,
   AUDIO_CMD_PLAY,
   AUDIO_CMD_STOP,
-}AUDIO_CMD_TypeDef;
+}
+AUDIO_CMD_TypeDef;
 
 
 typedef enum
@@ -236,7 +244,8 @@ typedef struct
     int8_t  (*MuteCtl)      (uint8_t cmd);
     int8_t  (*PeriodicTC)   (uint8_t cmd);
     int8_t  (*GetState)     (void);
-}USBD_AUDIO_ItfTypeDef;
+}
+USBD_AUDIO_ItfTypeDef;
 /**
   * @}
   */
