@@ -237,7 +237,7 @@ Device Descriptor:
 * Monitor audio playback status (change the `X` in `cardX` to the number of actual device)
 
 ```bash
-$ watch -n cat /proc/asound/cardX/stream0                                                    
+$ watch -n 1 cat /proc/asound/cardX/stream0                                                    
 Dragonode Audio Venus DAC at usb-0000:00:02.0-3, full speed : USB Audio
 
 Playback:
